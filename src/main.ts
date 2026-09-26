@@ -14,14 +14,14 @@ const environment = new Environment();
 const agents  = [new Agent('Alice'), new Agent('Bob'), new Agent('Carl')];
 
 for (const agent of agents) {
-  environment.addAgent(agent);
+  environment.addAgent(agent.name);
 }
 
 loop((time: number) => {
   for (const agent of agents) {
-    const state = environment.getStateFor(agent);
+    const state = environment.getStateFor(agent.name);
     const action = agent.getAction(state);
-    environment.addActionIntent(agent, action);
+    environment.addActionIntent(agent.name, action);
   }
   
   environment.update(time);

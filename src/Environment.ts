@@ -1,7 +1,7 @@
-import { Agent } from "./Agent";
+export type AgentId = string;
 
 interface AgentState {
-  name: string;
+  id: AgentId;
   goldAmount: number;
   usdAmount: number;
 }
@@ -19,7 +19,7 @@ export type Action = {
 export interface EnvironmentDisplayState {
   exchangeRate: number;
   agents: {
-    name: string;
+    id: AgentId;
     goldAmount: number;
     usdAmount: number;
     capital: number;
@@ -27,30 +27,30 @@ export interface EnvironmentDisplayState {
 }
 
 export class Environment {
-  private _agentActions = new Map<Agent, Action>();
+  private _agentActions = new Map<AgentId, Action>();
   private _agentStates: AgentState[] = [];
 
   private _exchangeRate = 1;
 
-  addAgent(agent: Agent) {
+  addAgent(agentId: AgentId) {
     this._agentStates.push({
-      name: agent.name,
+      id: agentId,
       goldAmount: 0,    // Initial amount in gold
       usdAmount: 1000,  // Initial amount in USD
     });
   }
 
-  private _getAgentState(agent: Agent): AgentState {
-    const agentState = this._agentStates.find((s) => s.name === agent.name);
+  private _getAgentState(agentId: AgentId): AgentState {
+    const agentState = this._agentStates.find((s) => s.id === agentId);
     if (!agentState) {
-      throw new Error(`Agent state not found for ${agent.name}`);
+      throw new Error(`Agent state not found for ${agentId}`);
     }
 
     return agentState;
   }
 
-  getStateFor(agent: Agent): EnvironmentAgentState {
-    const agentState = this._getAgentState(agent);
+  getStateFor(agentId: AgentId): EnvironmentAgentState {
+    const agentState = this._getAgentState(agentId);
 
     return {
       exchangeRate: this._exchangeRate,
@@ -64,7 +64,7 @@ export class Environment {
     return {
       exchangeRate: this._exchangeRate,
       agents: this._agentStates.map((s) => ({
-        name: s.name,
+        id: s.id,
         goldAmount: s.goldAmount,
         usdAmount: s.usdAmount,
         capital: s.usdAmount + s.goldAmount * this._exchangeRate
@@ -72,8 +72,8 @@ export class Environment {
     };
   }
 
-  addActionIntent(agent: Agent, action: Action) {
-    this._agentActions.set(agent, action);
+  addActionIntent(agentId: AgentId, action: Action) {
+    this._agentActions.set(agentId, action);
   }
 
   update (time: number) {

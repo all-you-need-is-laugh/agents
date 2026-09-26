@@ -26,7 +26,7 @@ export class Display {
         ${
           agents.map(agent => `
             <tr>
-              <td>${agent.name}</td><td>${agent.usdAmount.toFixed(2)}</td><td>${agent.goldAmount.toFixed(2)}</td><td>${agent.capital.toFixed(2)}</td>
+              <td>${agent.id}</td><td>${agent.usdAmount.toFixed(2)}</td><td>${agent.goldAmount.toFixed(2)}</td><td>${agent.capital.toFixed(2)}</td>
             </tr>
           `).join('\n')
         }
