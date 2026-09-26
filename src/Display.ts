@@ -21,7 +21,7 @@ export class Display {
       <br/>
       <table>
         <tr>
-          <td width=100><b>Name</b></td><td width=100><b>USD</b></td><td width=100><b>Gold</b></td><td width=100><b>Capital</b></td>
+          <td width=200><b>Name</b></td><td width=100><b>USD</b></td><td width=100><b>Gold</b></td><td width=100><b>Capital</b></td>
         </tr>
         ${
           agents.map(agent => `

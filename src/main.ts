@@ -1,6 +1,7 @@
-import { Agent } from "./Agent";
 import { Display } from "./Display";
-import { Environment } from "./Environment";
+import { Agent, Environment } from "./Environment";
+import { GreedyAgent } from "./GreedyAgent";
+import { RandomAgent } from "./RandomAgent";
 import { loop } from "./utils/loop";
 
 const contentElement = document.querySelector<HTMLDivElement>('#app');
@@ -11,23 +12,29 @@ if (!contentElement) {
 
 const display = new Display(contentElement);
 const environment = new Environment();
-const agents  = [new Agent('Alice'), new Agent('Bob'), new Agent('Carl')];
+const agents: Agent[] = [
+  new RandomAgent('Alice'),
+  new RandomAgent('Bob'),
+  new RandomAgent('Carl'),
+  new GreedyAgent('Dave'),
+  new GreedyAgent('Erl', 0.49, 0.51),
+];
 
 for (const agent of agents) {
-  environment.addAgent(agent.name);
+  environment.addAgent(agent.id);
 }
 
 loop((time: number) => {
   for (const agent of agents) {
-    const state = environment.getStateFor(agent.name);
+    const state = environment.getStateFor(agent.id);
     const action = agent.getAction(state);
-    environment.addActionIntent(agent.name, action);
+    environment.addActionIntent(agent.id, action);
   }
-  
+
   environment.update(time);
 
   const environmentState = environment.getDisplayState();
-  
+
   display.update({ time, environmentState });
 
   // feedback can be provided here

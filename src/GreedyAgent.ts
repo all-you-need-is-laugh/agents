@@ -1,0 +1,24 @@
+import { Action, Agent, EnvironmentAgentState } from "./Environment";
+
+export class GreedyAgent implements Agent {
+  public readonly id: string;
+  constructor(
+    name: string,
+    private _buyThreshold = 0.1,
+    private _sellThreshold = 0.9,
+  ) {
+    this.id = `${name} (greedy: ${this._buyThreshold}/${this._sellThreshold})`
+  }
+
+  getAction(state: EnvironmentAgentState): Action {
+    if (state.exchangeRate <= this._buyThreshold) {
+      return { buy: 100 }
+    }
+
+    if (state.exchangeRate >= this._sellThreshold) {
+      return { buy: -100 }
+    }
+
+    return { buy: 0 };
+  }
+}

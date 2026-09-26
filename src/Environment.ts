@@ -1,5 +1,10 @@
 export type AgentId = string;
 
+export interface Agent {
+  id: AgentId;
+  getAction(state: EnvironmentAgentState): Action;
+}
+
 interface AgentState {
   id: AgentId;
   goldAmount: number;

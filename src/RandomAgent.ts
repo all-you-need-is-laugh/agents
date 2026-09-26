@@ -1,10 +1,10 @@
-import { Action, EnvironmentAgentState } from "./Environment";
+import { Action, Agent, EnvironmentAgentState } from "./Environment";
 
-export class Agent {
+export class RandomAgent implements Agent {
   private _leverage = Math.ceil(Math.random() * 100);
-  public readonly name: string;
+  public readonly id: string;
   constructor(name: string) {
-    this.name = `${name} (${this._leverage})`
+    this.id = `${name} (random: ${this._leverage})`
   }
 
   getAction(state: EnvironmentAgentState): Action {
