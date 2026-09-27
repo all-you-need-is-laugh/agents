@@ -138,7 +138,7 @@ export class Display {
         </tr>
         ${agents.map(agent => `
             <tr>
-              <td>${agent.id}</td><td>${agent.usdAmount.toFixed(2)}</td><td>${agent.goldAmount.toFixed(2)}</td><td>${agent.capital.toFixed(2)}</td><td>${agent.appliedAction?.buyGoldAmount.toFixed(2)} (${agent.intentAction?.buyGoldAmount.toFixed(2)})</td>
+              <td>${agent.id}</td><td>${agent.usdAmount.toFixed(2)}</td><td>${agent.goldAmount.toFixed(2)}</td><td><b>${agent.capital.toFixed(2)}</b></td><td>${agent.appliedAction?.buyGoldAmount.toFixed(2)} (${agent.intentAction?.buyGoldAmount.toFixed(2)})</td>
             </tr>
           `).join('\n')
       }
