@@ -32,6 +32,8 @@ interface ChartData {
   agentIds: string[];
   buyRates: number[];
   sellRates: number[];
+  usdAmounts: Map<string, number[]>;
+  goldAmounts: Map<string, number[]>;
   capitals: Map<string, number[]>;
   decisions: Map<string, number[]>;
 }
@@ -112,23 +114,27 @@ export class Display {
       environmentState.agents.map(agent => agent.id)
     ))];
 
-    const capitals = new Map<string, number[]>();
-    const decisions = new Map<string, number[]>();
-    for (const agentId of agentIds) {
-      // an agent missing at some tick gets no capital point and no decision there
-      capitals.set(agentId, history.map(({ environmentState }) =>
-        environmentState.agents.find(agent => agent.id === agentId)?.capital ?? NaN
-      ));
-      decisions.set(agentId, history.map(({ environmentState }) =>
-        environmentState.agents.find(agent => agent.id === agentId)?.action?.buy ?? 0
-      ));
-    }
+    type AgentDisplayState = EnvironmentDisplayState['agents'][number];
+
+    // an agent missing at some tick gets `missing` there (no point / no decision)
+    const perAgent = (pick: (agent: AgentDisplayState) => number, missing: number) =>
+      new Map(agentIds.map(agentId => [agentId, history.map(({ environmentState }) => {
+        const agent = environmentState.agents.find(agent => agent.id === agentId);
+        return agent ? pick(agent) : missing;
+      })]));
+
+    const usdAmounts = perAgent(agent => agent.usdAmount, NaN);
+    const goldAmounts = perAgent(agent => agent.goldAmount, NaN);
+    const capitals = perAgent(agent => agent.capital, NaN);
+    const decisions = perAgent(agent => agent.action?.buy ?? 0, 0);
 
     return {
       times: history.map(({ time }) => time.toString()),
       agentIds,
       buyRates: history.map(({ environmentState }) => environmentState.buyRate),
       sellRates: history.map(({ environmentState }) => environmentState.sellRate),
+      usdAmounts,
+      goldAmounts,
       capitals,
       decisions,
     };
@@ -251,10 +257,18 @@ export class Display {
       Buy rate: ${data.buyRates[index].toFixed(4)}<br/>
       Sell rate: ${data.sellRates[index].toFixed(4)}
       <table style="margin-top:4px">
-        <tr><td><b>Agent</b></td><td style="padding-left:12px"><b>Capital</b></td><td style="padding-left:12px"><b>Decision</b></td></tr>
+        <tr>
+          <td><b>Agent</b></td>
+          <td style="padding-left:12px"><b>USD</b></td>
+          <td style="padding-left:12px"><b>Gold</b></td>
+          <td style="padding-left:12px"><b>Capital</b></td>
+          <td style="padding-left:12px"><b>Decision</b></td>
+        </tr>
         ${data.agentIds.map(agentId => `
           <tr>
             <td>${agentId}</td>
+            <td style="padding-left:12px">${data.usdAmounts.get(agentId)![index].toFixed(2)}</td>
+            <td style="padding-left:12px">${data.goldAmounts.get(agentId)![index].toFixed(2)}</td>
             <td style="padding-left:12px">${data.capitals.get(agentId)![index].toFixed(2)}</td>
             <td style="padding-left:12px">${decision(data.decisions.get(agentId)![index])}</td>
           </tr>
