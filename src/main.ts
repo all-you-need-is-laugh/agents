@@ -2,6 +2,7 @@ import { GreedyAgent } from "./agents/GreedyAgent";
 import { RandomAgent } from "./agents/RandomAgent";
 import { Display } from "./Display";
 import { Agent, Environment } from "./Environment";
+import { NeuralNetworkAgent } from "./NeuralNetworkAgent";
 import { loop } from "./utils/loop";
 
 const contentElement = document.querySelector<HTMLDivElement>('#app');
@@ -18,6 +19,7 @@ const agents: Agent[] = [
   new RandomAgent('Carl'),
   new GreedyAgent('Dave'),
   new GreedyAgent('Erl', 0.49, 0.51),
+  new NeuralNetworkAgent('Freddy', [3]),
 ];
 
 for (const agent of agents) {
