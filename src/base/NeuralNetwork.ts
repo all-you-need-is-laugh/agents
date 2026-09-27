@@ -84,7 +84,7 @@ export class NeuralNetwork {
     }
 
     layers.push(
-      this._generateRandomNeuralLayer(internalLayerSizes[internalLayerSizes.length - 1], outputSize)
+      this._generateRandomNeuralLayer(prevLayerSize, outputSize)
     );
 
     return new NeuralNetwork(inputSize, outputSize, layers);
