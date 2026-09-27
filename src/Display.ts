@@ -53,6 +53,9 @@ const DECISION_GRID = 2;
 // its own axis labels, which would misalign them. left must fit the longest agent name
 const GRID_BOUNDS = { left: 160, right: 30, outerBoundsMode: 'none' as const };
 
+const LEGEND_LINE_HEIGHT = 22;
+const AGENTS_PER_LEGEND_LINE = 4;
+
 export class Display {
   private _lastUpdateTime = 0;
 
@@ -60,7 +63,7 @@ export class Display {
 
   constructor(
     private textContentElement: HTMLElement,
-    chartElement: HTMLElement
+    private chartElement: HTMLElement
   ) {
     this._chart = echarts.init(chartElement);
   }
@@ -144,6 +147,18 @@ export class Display {
       });
     });
 
+    // first line holds the rates, the rest hold the agents in chunks
+    const legendLines = [['Buy rate', 'Sell rate']];
+    for (let i = 0; i < agentIds.length; i += AGENTS_PER_LEGEND_LINE) {
+      legendLines.push(agentIds.slice(i, i + AGENTS_PER_LEGEND_LINE));
+    }
+
+    const rateGridTop = legendLines.length * LEGEND_LINE_HEIGHT + 30;
+    const capitalGridTop = rateGridTop + 220;
+    const decisionGridTop = capitalGridTop + 260;
+    const decisionGridHeight = 24 * agentIds.length;
+    this._fitChartHeight(decisionGridTop + decisionGridHeight + 30);
+
     const xAxis = (gridIndex: number) => ({
       type: 'category' as const,
       gridIndex,
@@ -155,13 +170,12 @@ export class Display {
     this._chart.setOption({
       animation: false,
       color: SERIES_COLORS,
-      legend: {
-        type: 'scroll',
-        top: 0,
+      legend: legendLines.map((names, line) => ({
+        top: line * LEGEND_LINE_HEIGHT,
         left: GRID_BOUNDS.left,
         right: GRID_BOUNDS.right,
-        data: ['Buy rate', 'Sell rate', ...agentIds],
-      },
+        data: names,
+      })),
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'line' },
@@ -169,9 +183,9 @@ export class Display {
       },
       axisPointer: { link: [{ xAxisIndex: 'all' }] },
       grid: [
-        { ...GRID_BOUNDS, top: 60, height: 180 },
-        { ...GRID_BOUNDS, top: 280, height: 220 },
-        { ...GRID_BOUNDS, top: 540, height: 24 * agentIds.length },
+        { ...GRID_BOUNDS, top: rateGridTop, height: 180 },
+        { ...GRID_BOUNDS, top: capitalGridTop, height: 220 },
+        { ...GRID_BOUNDS, top: decisionGridTop, height: decisionGridHeight },
       ],
       xAxis: [xAxis(RATE_GRID), xAxis(CAPITAL_GRID), xAxis(DECISION_GRID)],
       yAxis: [
@@ -210,6 +224,12 @@ export class Display {
         },
       ],
     });
+  }
+
+  private _fitChartHeight(height: number): void {
+    if (this.chartElement.clientHeight === height) return;
+    this.chartElement.style.height = `${height}px`;
+    this._chart.resize();
   }
 
   // built from the chart data rather than params, so it looks the same whichever grid is hovered
