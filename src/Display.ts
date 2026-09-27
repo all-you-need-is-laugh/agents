@@ -57,8 +57,12 @@ const DECISION_GRID = 2;
 // its own axis labels, which would misalign them. left must fit the longest agent name
 const GRID_BOUNDS = { left: 160, right: 30, outerBoundsMode: 'none' as const };
 
-const LEGEND_LINE_HEIGHT = 22;
-const AGENTS_PER_LEGEND_LINE = 4;
+const LEGEND_HEIGHT = 22;
+
+const agentColor = (agentIndex: number) => SERIES_COLORS[agentIndex % SERIES_COLORS.length];
+
+const colorDot = (color: string) =>
+  `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${color}"></span>`;
 
 export class Display {
   private _lastUpdateTime = 0;
@@ -169,13 +173,7 @@ export class Display {
       });
     });
 
-    // first line holds the rates, the rest hold the agents in chunks
-    const legendLines = [['Buy rate', 'Sell rate']];
-    for (let i = 0; i < agentIds.length; i += AGENTS_PER_LEGEND_LINE) {
-      legendLines.push(agentIds.slice(i, i + AGENTS_PER_LEGEND_LINE));
-    }
-
-    const rateGridTop = legendLines.length * LEGEND_LINE_HEIGHT + 30;
+    const rateGridTop = LEGEND_HEIGHT + 30;
     const capitalGridTop = rateGridTop + 220;
     const decisionGridTop = capitalGridTop + 260;
     const decisionGridHeight = 24 * agentIds.length;
@@ -197,12 +195,13 @@ export class Display {
     this._chart.setOption({
       animation: false,
       color: SERIES_COLORS,
-      legend: legendLines.map((names, line) => ({
-        top: line * LEGEND_LINE_HEIGHT,
+      // agents are identified by the color dots in the tooltip instead
+      legend: {
+        top: 0,
         left: GRID_BOUNDS.left,
         right: GRID_BOUNDS.right,
-        data: names,
-      })),
+        data: ['Buy rate', 'Sell rate'],
+      },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'line' },
@@ -246,7 +245,7 @@ export class Display {
           name: agentId, type: 'line' as const, showSymbol: false,
           xAxisIndex: CAPITAL_GRID, yAxisIndex: CAPITAL_GRID,
           data: data.capitals.get(agentId),
-          itemStyle: { color: SERIES_COLORS[index % SERIES_COLORS.length] },
+          itemStyle: { color: agentColor(index) },
         })),
         {
           name: 'Decisions', type: 'heatmap',
@@ -356,9 +355,9 @@ export class Display {
           <td style="padding-left:12px"><b>Capital</b></td>
           <td style="padding-left:12px"><b>Decision</b></td>
         </tr>
-        ${data.agentIds.map(agentId => `
+        ${data.agentIds.map((agentId, agentIndex) => `
           <tr>
-            <td>${agentId}</td>
+            <td>${colorDot(agentColor(agentIndex))}${agentId}</td>
             <td style="padding-left:12px">${data.usdAmounts.get(agentId)![index].toFixed(2)}</td>
             <td style="padding-left:12px">${data.goldAmounts.get(agentId)![index].toFixed(2)}</td>
             <td style="padding-left:12px">${data.capitals.get(agentId)![index].toFixed(2)}</td>
