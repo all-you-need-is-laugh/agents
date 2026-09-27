@@ -2,6 +2,7 @@ import * as echarts from "echarts/core";
 import { HeatmapChart, LineChart } from "echarts/charts";
 import {
   AxisPointerComponent,
+  GraphicComponent,
   GridComponent,
   LegendComponent,
   TooltipComponent,
@@ -15,6 +16,7 @@ echarts.use([
   HeatmapChart,
   GridComponent,
   AxisPointerComponent,
+  GraphicComponent,
   LegendComponent,
   TooltipComponent,
   VisualMapComponent,
@@ -63,11 +65,25 @@ export class Display {
 
   private _chart: echarts.ECharts;
 
+  private _data: ChartData | null = null;
+  private _plotTop = 0;
+  private _plotBottom = 0;
+
+  // time the tooltip is pinned to by a click; null while it follows the mouse
+  private _capturedTime: string | null = null;
+
   constructor(
     private textContentElement: HTMLElement,
     private chartElement: HTMLElement
   ) {
     this._chart = echarts.init(chartElement);
+
+    this._chart.getZr().on('click', ({ offsetX, offsetY }) => this._capture(offsetX, offsetY));
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') this._release();
+      else if (event.key === 'ArrowLeft') this._moveCapture(-1, event);
+      else if (event.key === 'ArrowRight') this._moveCapture(1, event);
+    });
   }
 
   public update(history: DisplayContext[]) {
@@ -165,11 +181,16 @@ export class Display {
     const decisionGridHeight = 24 * agentIds.length;
     this._fitChartHeight(decisionGridTop + decisionGridHeight + 30);
 
+    this._data = data;
+    this._plotTop = rateGridTop;
+    this._plotBottom = decisionGridTop + decisionGridHeight;
+
     const xAxis = (gridIndex: number) => ({
       type: 'category' as const,
       gridIndex,
       data: data.times,
-      boundaryGap: gridIndex === DECISION_GRID,
+      // same on every grid, so a tick has the same x across all charts
+      boundaryGap: true,
       axisLabel: { show: gridIndex === DECISION_GRID },
     });
 
@@ -234,6 +255,72 @@ export class Display {
         },
       ],
     });
+
+    this._renderCapture();
+  }
+
+  private _capture(x: number, y: number): void {
+    if (!this._data) return;
+
+    const gridIndex = [RATE_GRID, CAPITAL_GRID, DECISION_GRID]
+      .find(gridIndex => this._chart.containPixel({ gridIndex }, [x, y]));
+    if (gridIndex === undefined) return;
+
+    const value = this._chart.convertFromPixel({ xAxisIndex: gridIndex }, x) as number;
+    const index = Math.min(Math.max(Math.round(value), 0), this._data.times.length - 1);
+
+    this._capturedTime = this._data.times[index];
+    this._renderCapture();
+  }
+
+  // steps the captured time by `step` ticks, stopping at the first and last tick
+  private _moveCapture(step: number, event: KeyboardEvent): void {
+    if (this._capturedTime === null || !this._data) return;
+
+    const index = this._data.times.indexOf(this._capturedTime);
+    if (index < 0) return;
+
+    // keep the page from scrolling sideways while stepping
+    event.preventDefault();
+
+    const nextIndex = Math.min(Math.max(index + step, 0), this._data.times.length - 1);
+    if (nextIndex === index) return;
+
+    this._capturedTime = this._data.times[nextIndex];
+    this._renderCapture();
+  }
+
+  private _release(): void {
+    if (this._capturedTime === null) return;
+
+    this._capturedTime = null;
+    this._renderCapture();
+  }
+
+  // shows a marker at the captured time and keeps the tooltip on it; hides both when released
+  private _renderCapture(): void {
+    const index = this._capturedTime === null ? -1 : this._data?.times.indexOf(this._capturedTime) ?? -1;
+    const isCaptured = index >= 0;
+    const x = isCaptured
+      ? this._chart.convertToPixel({ xAxisIndex: RATE_GRID }, this._capturedTime!) as number
+      : 0;
+
+    this._chart.setOption({
+      tooltip: { alwaysShowContent: isCaptured },
+      graphic: [{
+        id: 'captured-time',
+        type: 'line',
+        silent: true,
+        invisible: !isCaptured,
+        z: 100,
+        shape: { x1: x, y1: this._plotTop, x2: x, y2: this._plotBottom },
+        style: { stroke: '#e63946', lineWidth: 1.5, lineDash: [4, 3] },
+      }],
+    });
+
+    this._chart.dispatchAction(isCaptured
+      ? { type: 'showTip', seriesIndex: 0, dataIndex: index }
+      : { type: 'hideTip' });
   }
 
   private _fitChartHeight(height: number): void {
@@ -244,10 +331,11 @@ export class Display {
 
   // built from the chart data rather than params, so it looks the same whichever grid is hovered
   private _formatTooltip(params: unknown, data: ChartData): string {
-    const [first] = params as { axisValue: string }[];
-    if (!first) return '';
+    // a captured time wins over whatever the mouse is hovering
+    const time = this._capturedTime ?? (params as { axisValue: string }[])[0]?.axisValue;
+    if (time === undefined) return '';
 
-    const index = data.times.indexOf(first.axisValue);
+    const index = data.times.indexOf(time);
     if (index < 0) return '';
 
     const decision = (value: number) => {
@@ -257,7 +345,7 @@ export class Display {
     };
 
     return `
-      <b>Time ${first.axisValue}</b><br/>
+      <b>Time ${time}</b>${this._capturedTime === null ? '' : ' <span style="color:#e63946">(captured: ←/→ to move, Esc to release)</span>'}<br/>
       Buy rate: ${data.buyRates[index].toFixed(4)}<br/>
       Sell rate: ${data.sellRates[index].toFixed(4)}
       <table style="margin-top:4px">
