@@ -101,7 +101,10 @@ const colorDot = (color: string) =>
   `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${color}"></span>`;
 
 export class Display {
-  private _lastUpdateTime = 0;
+  // FPS is averaged over each second and refreshed once per second
+  private _fps = 0;
+  private _fpsWindowStart = 0;
+  private _fpsWindowFrames = 0;
 
   private _chart: echarts.ECharts;
 
@@ -187,11 +190,18 @@ export class Display {
     }
   }: DisplayContext): void {
     const now = Date.now();
-    const fps = this._lastUpdateTime ? 1_000 / (now - this._lastUpdateTime) : 0;
-    this._lastUpdateTime = now;
+    if (!this._fpsWindowStart) this._fpsWindowStart = now;
+    this._fpsWindowFrames++;
+
+    const elapsed = now - this._fpsWindowStart;
+    if (elapsed >= 1_000) {
+      this._fps = this._fpsWindowFrames * 1_000 / elapsed;
+      this._fpsWindowStart = now;
+      this._fpsWindowFrames = 0;
+    }
 
     this.textContentElement.innerHTML = `
-      <div>Time lapsed: ${time} [FPS: ${fps.toFixed(0)}]</div>
+      <div>Time lapsed: ${time} [FPS: ${this._fps.toFixed(0)}]</div>
       <div>Buy rate: ${buyRate}</div>
       <div>Sell rate: ${sellRate}</div>
       <br/>
