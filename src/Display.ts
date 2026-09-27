@@ -91,6 +91,9 @@ export class Display {
   // whether _hoveredSeries was set from an action chart, so leaving it clears only its own highlight
   private _isHoveringActions = false;
 
+  // agents whose capital line is switched off from the tooltip checkboxes
+  private _hiddenAgentIds = new Set<string>();
+
   constructor(
     private textContentElement: HTMLElement,
     private chartElement: HTMLElement
@@ -104,6 +107,13 @@ export class Display {
     });
     this._chart.on('mouseout', { seriesType: 'line' }, () => this._setHoveredSeries(null));
     this._chart.getZr().on('mousemove', ({ offsetX, offsetY }) => this._hoverActionRow(offsetX, offsetY));
+
+    // the tooltip DOM lives inside the chart element, so its checkboxes are handled by delegation
+    chartElement.addEventListener('change', ({ target }) => {
+      if (target instanceof HTMLInputElement && target.dataset.toggleAgent) {
+        this._toggleAgent(target.dataset.toggleAgent, target.checked);
+      }
+    });
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') this._release();
       else if (event.key === 'ArrowLeft') this._moveCapture(-1, event);
@@ -261,6 +271,8 @@ export class Display {
         position: (_point: number[], _params: unknown, _dom: unknown, _rect: unknown, size: { viewSize: number[] }) =>
           [size.viewSize[0] + 10, 0],
         transitionDuration: 0,
+        // lets the mouse reach the capital-line checkboxes; easiest while the tooltip is captured
+        enterable: true,
         formatter: (params: unknown) => this._formatTooltip(params, data),
       },
       axisPointer: { link: [{ xAxisIndex: 'all' }] },
@@ -310,7 +322,7 @@ export class Display {
         ...agentIds.map((agentId, index) => ({
           name: agentId, type: 'line' as const, showSymbol: false,
           xAxisIndex: CAPITAL_GRID, yAxisIndex: CAPITAL_GRID,
-          data: data.capitals.get(agentId),
+          data: this._hiddenAgentIds.has(agentId) ? [] : data.capitals.get(agentId),
           // fire mouseover for the line itself, not only its (hidden) symbols
           triggerLineEvent: true,
           itemStyle: { color: agentColor(index) },
@@ -415,6 +427,14 @@ export class Display {
     this._isHoveringActions = gridIndex !== undefined;
   }
 
+  private _toggleAgent(agentId: string, isVisible: boolean): void {
+    if (isVisible) this._hiddenAgentIds.delete(agentId);
+    else this._hiddenAgentIds.add(agentId);
+
+    // redraw now rather than waiting for the next chart update, which may never come once the loop ends
+    if (this._data) this._drawCharts(this._data);
+  }
+
   private _setHoveredSeries(series: string | null): void {
     if (this._hoveredSeries === series) return;
     this._hoveredSeries = series;
@@ -465,7 +485,15 @@ export class Display {
         </tr>
         ${data.agentIds.map((agentId, agentIndex) => `
           <tr ${rowAttributes(agentId)}>
-            <td>${colorDot(agentColor(agentIndex))}${agentId}</td>
+            <td style="opacity:${this._hiddenAgentIds.has(agentId) ? 0.5 : 1}">
+              <input
+                type="checkbox"
+                title="Show capital line"
+                data-toggle-agent="${agentId}"
+                ${this._hiddenAgentIds.has(agentId) ? '' : 'checked'}
+                style="margin:0 6px 0 0;vertical-align:middle"
+              />${colorDot(agentColor(agentIndex))}${agentId}
+            </td>
             <td style="padding-left:12px">${data.usdAmounts.get(agentId)![index].toFixed(2)}</td>
             <td style="padding-left:12px">${data.goldAmounts.get(agentId)![index].toFixed(2)}</td>
             <td style="padding-left:12px">${data.capitals.get(agentId)![index].toFixed(2)}</td>
