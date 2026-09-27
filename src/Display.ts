@@ -6,6 +6,7 @@ interface DisplayContext {
 };
 
 export class Display {
+  private _lastUpdateTime = 0;
   constructor(private contentElement: HTMLElement) {}
 
   public update({
@@ -15,8 +16,12 @@ export class Display {
     agents
   }
 }: DisplayContext) {
+    const now = Date.now();
+    const fps = this._lastUpdateTime ? 1_000 / (now - this._lastUpdateTime): 0;
+    this._lastUpdateTime = now;
+
     this.contentElement.innerHTML = `
-      <div>Time lapsed: ${time}</div>
+      <div>Time lapsed: ${time} [FPS: ${fps.toFixed(0)}]</div>
       <div>Exchange rate: ${exchangeRate}</div>
       <br/>
       <table>
