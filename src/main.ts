@@ -1,6 +1,6 @@
 import { GreedyAgent } from "./agents/GreedyAgent";
 import { RandomAgent } from "./agents/RandomAgent";
-import { Display } from "./Display";
+import { Display, DisplayContext } from "./Display";
 import { Agent, Environment } from "./Environment";
 import { NeuralNetworkAgent } from "./NeuralNetworkAgent";
 import { loop } from "./utils/loop";
@@ -33,6 +33,8 @@ for (const agent of agents) {
   environment.addAgent(agent.id);
 }
 
+const simulationHistory: DisplayContext[] = [];
+
 loop((time: number) => {
   for (const agent of agents) {
     const state = environment.getStateFor(agent.id);
@@ -44,7 +46,8 @@ loop((time: number) => {
 
   const environmentState = environment.getDisplayState();
 
-  display.update({ time, environmentState });
+  simulationHistory.push({ time, environmentState });
+  display.update(simulationHistory);
 
   // feedback can be provided here
 

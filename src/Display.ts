@@ -21,10 +21,20 @@ echarts.use([
   CanvasRenderer,
 ]);
 
-interface DisplayContext {
+export interface DisplayContext {
   environmentState: EnvironmentDisplayState;
   time: number;
 };
+
+// per-series values indexed by tick, aligned with times
+interface ChartData {
+  times: string[];
+  agentIds: string[];
+  buyRates: number[];
+  sellRates: number[];
+  capitals: Map<string, number[]>;
+  decisions: Map<string, number[]>;
+}
 
 const SERIES_COLORS = [
   '#2a9d8f', '#e76f51', '#264653', '#e9c46a', '#8338ec',
@@ -39,17 +49,14 @@ const RATE_GRID = 0;
 const CAPITAL_GRID = 1;
 const DECISION_GRID = 2;
 
+// fixed plot bounds for every grid; 'none' stops ECharts from shrinking each grid to fit
+// its own axis labels, which would misalign them. left must fit the longest agent name
+const GRID_BOUNDS = { left: 160, right: 30, outerBoundsMode: 'none' as const };
+
 export class Display {
   private _lastUpdateTime = 0;
 
   private _chart: echarts.ECharts;
-
-  // all histories are indexed by tick, aligned with _times
-  private _times: string[] = [];
-  private _buyRateHistory: number[] = [];
-  private _sellRateHistory: number[] = [];
-  private _capitalHistory = new Map<string, number[]>();
-  private _decisionHistory = new Map<string, number[]>();
 
   constructor(
     private textContentElement: HTMLElement,
@@ -58,10 +65,12 @@ export class Display {
     this._chart = echarts.init(chartElement);
   }
 
-  public update(displayContext: DisplayContext) {
-    this._updateText(displayContext);
-    this._updateHistory(displayContext);
-    this._drawCharts();
+  public update(history: DisplayContext[]) {
+    const current = history.at(-1);
+    if (!current) return;
+
+    this._updateText(current);
+    this._drawCharts(this._toChartData(history));
   }
 
   private _updateText({
@@ -95,41 +104,40 @@ export class Display {
     `;
   }
 
-  private _updateHistory({
-    time,
-    environmentState: {
-      buyRate,
-      sellRate,
-      agents,
-    }
-  }: DisplayContext): void {
-    this._times.push(time.toString());
-    this._buyRateHistory.push(buyRate);
-    this._sellRateHistory.push(sellRate);
+  private _toChartData(history: DisplayContext[]): ChartData {
+    const agentIds = [...new Set(history.flatMap(({ environmentState }) =>
+      environmentState.agents.map(agent => agent.id)
+    ))];
 
-    for (const agent of agents) {
-      this._getHistory(this._capitalHistory, agent.id).push(agent.capital);
-      this._getHistory(this._decisionHistory, agent.id).push(agent.action?.buy ?? 0);
+    const capitals = new Map<string, number[]>();
+    const decisions = new Map<string, number[]>();
+    for (const agentId of agentIds) {
+      // an agent missing at some tick gets no capital point and no decision there
+      capitals.set(agentId, history.map(({ environmentState }) =>
+        environmentState.agents.find(agent => agent.id === agentId)?.capital ?? NaN
+      ));
+      decisions.set(agentId, history.map(({ environmentState }) =>
+        environmentState.agents.find(agent => agent.id === agentId)?.action?.buy ?? 0
+      ));
     }
+
+    return {
+      times: history.map(({ time }) => time.toString()),
+      agentIds,
+      buyRates: history.map(({ environmentState }) => environmentState.buyRate),
+      sellRates: history.map(({ environmentState }) => environmentState.sellRate),
+      capitals,
+      decisions,
+    };
   }
 
-  // an agent added mid-run gets its history padded so indices stay aligned with _times
-  private _getHistory(histories: Map<string, number[]>, agentId: string): number[] {
-    let history = histories.get(agentId);
-    if (!history) {
-      history = new Array(this._times.length - 1).fill(NaN);
-      histories.set(agentId, history);
-    }
-    return history;
-  }
-
-  private _drawCharts(): void {
-    const agentIds = [...this._capitalHistory.keys()];
+  private _drawCharts(data: ChartData): void {
+    const { agentIds } = data;
 
     const heatmapData: [number, number, number][] = [];
     let maxAmount = 0;
     agentIds.forEach((agentId, agentIndex) => {
-      this._decisionHistory.get(agentId)!.forEach((value, timeIndex) => {
+      data.decisions.get(agentId)!.forEach((value, timeIndex) => {
         if (!value) return;
         heatmapData.push([timeIndex, agentIndex, value]);
         maxAmount = Math.max(maxAmount, Math.abs(value));
@@ -139,7 +147,7 @@ export class Display {
     const xAxis = (gridIndex: number) => ({
       type: 'category' as const,
       gridIndex,
-      data: this._times,
+      data: data.times,
       boundaryGap: gridIndex === DECISION_GRID,
       axisLabel: { show: gridIndex === DECISION_GRID },
     });
@@ -148,19 +156,22 @@ export class Display {
       animation: false,
       color: SERIES_COLORS,
       legend: {
+        type: 'scroll',
         top: 0,
+        left: GRID_BOUNDS.left,
+        right: GRID_BOUNDS.right,
         data: ['Buy rate', 'Sell rate', ...agentIds],
       },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'line' },
-        formatter: (params: unknown) => this._formatTooltip(params, agentIds),
+        formatter: (params: unknown) => this._formatTooltip(params, data),
       },
       axisPointer: { link: [{ xAxisIndex: 'all' }] },
       grid: [
-        { top: 50, height: 180, left: 70, right: 30 },
-        { top: 270, height: 220, left: 70, right: 30 },
-        { top: 530, height: 24 * agentIds.length, left: 70, right: 30 },
+        { ...GRID_BOUNDS, top: 60, height: 180 },
+        { ...GRID_BOUNDS, top: 280, height: 220 },
+        { ...GRID_BOUNDS, top: 540, height: 24 * agentIds.length },
       ],
       xAxis: [xAxis(RATE_GRID), xAxis(CAPITAL_GRID), xAxis(DECISION_GRID)],
       yAxis: [
@@ -179,17 +190,17 @@ export class Display {
         {
           name: 'Buy rate', type: 'line', showSymbol: false,
           xAxisIndex: RATE_GRID, yAxisIndex: RATE_GRID,
-          data: this._buyRateHistory, itemStyle: { color: BUY_COLOR },
+          data: data.buyRates, itemStyle: { color: BUY_COLOR },
         },
         {
           name: 'Sell rate', type: 'line', showSymbol: false,
           xAxisIndex: RATE_GRID, yAxisIndex: RATE_GRID,
-          data: this._sellRateHistory, itemStyle: { color: SELL_COLOR },
+          data: data.sellRates, itemStyle: { color: SELL_COLOR },
         },
         ...agentIds.map((agentId, index) => ({
           name: agentId, type: 'line' as const, showSymbol: false,
           xAxisIndex: CAPITAL_GRID, yAxisIndex: CAPITAL_GRID,
-          data: this._capitalHistory.get(agentId),
+          data: data.capitals.get(agentId),
           itemStyle: { color: SERIES_COLORS[index % SERIES_COLORS.length] },
         })),
         {
@@ -201,12 +212,12 @@ export class Display {
     });
   }
 
-  // built from the stored histories rather than params, so it looks the same whichever grid is hovered
-  private _formatTooltip(params: unknown, agentIds: string[]): string {
+  // built from the chart data rather than params, so it looks the same whichever grid is hovered
+  private _formatTooltip(params: unknown, data: ChartData): string {
     const [first] = params as { axisValue: string }[];
     if (!first) return '';
 
-    const index = this._times.indexOf(first.axisValue);
+    const index = data.times.indexOf(first.axisValue);
     if (index < 0) return '';
 
     const decision = (value: number) => {
@@ -217,15 +228,15 @@ export class Display {
 
     return `
       <b>Time ${first.axisValue}</b><br/>
-      Buy rate: ${this._buyRateHistory[index].toFixed(4)}<br/>
-      Sell rate: ${this._sellRateHistory[index].toFixed(4)}
+      Buy rate: ${data.buyRates[index].toFixed(4)}<br/>
+      Sell rate: ${data.sellRates[index].toFixed(4)}
       <table style="margin-top:4px">
         <tr><td><b>Agent</b></td><td style="padding-left:12px"><b>Capital</b></td><td style="padding-left:12px"><b>Decision</b></td></tr>
-        ${agentIds.map(agentId => `
+        ${data.agentIds.map(agentId => `
           <tr>
             <td>${agentId}</td>
-            <td style="padding-left:12px">${this._capitalHistory.get(agentId)![index].toFixed(2)}</td>
-            <td style="padding-left:12px">${decision(this._decisionHistory.get(agentId)![index])}</td>
+            <td style="padding-left:12px">${data.capitals.get(agentId)![index].toFixed(2)}</td>
+            <td style="padding-left:12px">${decision(data.decisions.get(agentId)![index])}</td>
           </tr>
         `).join('')}
       </table>
