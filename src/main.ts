@@ -20,6 +20,8 @@ const agents: Agent[] = [
   new GreedyAgent('Dave'),
   new GreedyAgent('Erl', 0.49, 0.51),
   new NeuralNetworkAgent('Freddy', [3]),
+  new NeuralNetworkAgent('Geena', [4]),
+  new NeuralNetworkAgent('Henry', [5]),
 ];
 
 for (const agent of agents) {
