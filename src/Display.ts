@@ -27,17 +27,20 @@ export class Display {
   private _buyRateHistory: HistoryPoint[] = [];
   private _sellRateHistory: HistoryPoint[] = [];
   private _capitalHistory = new Map<string, HistoryPoint[]>();
+  private _decisionHistory = new Map<string, HistoryPoint[]>();
 
   constructor(
     private textContentElement: HTMLElement,
     private rateHistoryCanvasElement: HTMLCanvasElement,
-    private capitalHistoryCanvasElement: HTMLCanvasElement
+    private capitalHistoryCanvasElement: HTMLCanvasElement,
+    private decisionHistoryCanvasElement: HTMLCanvasElement
   ) { }
 
   public update(displayContext: DisplayContext) {
     this._updateText(displayContext);
     this._updateRateHistory(displayContext);
     this._updateCapitalHistory(displayContext);
+    this._updateDecisionHistory(displayContext);
   }
 
   private _updateText({
@@ -110,6 +113,81 @@ export class Display {
         history,
       }))
     );
+  }
+
+  private _updateDecisionHistory({
+    time,
+    environmentState: {
+      agents,
+    }
+  }: DisplayContext): void {
+    for (const agent of agents) {
+      let history = this._decisionHistory.get(agent.id);
+      if (!history) {
+        history = [];
+        this._decisionHistory.set(agent.id, history);
+      }
+      history.push({ time, value: agent.action?.buy ?? 0 });
+    }
+
+    this._drawDecisionChart(this.decisionHistoryCanvasElement);
+  }
+
+  // one row per agent, one cell per tick: green = buy, red = sell, opacity = amount
+  private _drawDecisionChart(canvas: HTMLCanvasElement): void {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { width, height } = canvas;
+    const padding = { top: 10, right: 10, bottom: 20, left: 60 };
+    const plotWidth = width - padding.left - padding.right;
+    const plotHeight = height - padding.top - padding.bottom;
+
+    ctx.clearRect(0, 0, width, height);
+
+    let minTime = Infinity;
+    let maxTime = -Infinity;
+    let maxAmount = 0;
+    for (const history of this._decisionHistory.values()) {
+      for (const { time, value } of history) {
+        if (time < minTime) minTime = time;
+        if (time > maxTime) maxTime = time;
+        if (Math.abs(value) > maxAmount) maxAmount = Math.abs(value);
+      }
+    }
+    if (minTime === Infinity) return;
+
+    const rows = [...this._decisionHistory];
+    const rowHeight = plotHeight / rows.length;
+    const cellWidth = plotWidth / (maxTime - minTime + 1);
+
+    // agent names
+    ctx.fillStyle = '#888';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    rows.forEach(([name], index) => {
+      ctx.fillText(name, padding.left - 4, padding.top + (index + 0.5) * rowHeight);
+    });
+
+    // time labels
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(minTime.toString(), padding.left, padding.top + plotHeight + 4);
+    ctx.textAlign = 'right';
+    ctx.fillText(maxTime.toString(), padding.left + plotWidth, padding.top + plotHeight + 4);
+
+    // cells
+    rows.forEach(([, history], index) => {
+      const y = padding.top + index * rowHeight;
+      for (const { time, value } of history) {
+        if (value === 0 || maxAmount === 0) continue;
+        ctx.globalAlpha = 0.15 + 0.85 * Math.abs(value) / maxAmount;
+        ctx.fillStyle = value > 0 ? '#2a9d8f' : '#e76f51';
+        ctx.fillRect(padding.left + (time - minTime) * cellWidth, y + 1, Math.max(cellWidth, 1), rowHeight - 2);
+      }
+    });
+    ctx.globalAlpha = 1;
   }
 
   private _drawChart(canvas: HTMLCanvasElement, series: ChartSeries[]): void {

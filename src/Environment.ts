@@ -30,11 +30,13 @@ export interface EnvironmentDisplayState {
     goldAmount: number;
     usdAmount: number;
     capital: number;
+    action: Action | null;
   }[];
 }
 
 export class Environment {
   private _agentActions = new Map<AgentId, Action>();
+  private _lastAgentActions = new Map<AgentId, Action>();
   private _agentStates: AgentState[] = [];
 
   private _exchangeRate = 1;
@@ -88,7 +90,8 @@ export class Environment {
         id: s.id,
         goldAmount: s.goldAmount,
         usdAmount: s.usdAmount,
-        capital: s.usdAmount + s.goldAmount * this._sellRate
+        capital: s.usdAmount + s.goldAmount * this._sellRate,
+        action: this._lastAgentActions.get(s.id) ?? null,
       }))
     };
   }
@@ -120,6 +123,7 @@ export class Environment {
     this._buyDeviation = 0.01 + Math.random() * 0.5;
     this._sellDeviation = 0.01 + Math.random() * 0.5;
 
+    this._lastAgentActions = new Map(this._agentActions);
     this._agentActions.clear();
   }
 }

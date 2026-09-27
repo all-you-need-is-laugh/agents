@@ -9,6 +9,7 @@ const contentElement = document.querySelector<HTMLDivElement>('#app');
 
 const rateHistoryCanvasElement = document.querySelector<HTMLCanvasElement>('#rate-history');
 const capitalHistoryCanvasElement = document.querySelector<HTMLCanvasElement>('#capital-history');
+const decisionHistoryCanvasElement = document.querySelector<HTMLCanvasElement>('#decision-history');
 
 if (!contentElement) {
   throw new Error('Content element not found');
@@ -22,7 +23,16 @@ if (!capitalHistoryCanvasElement) {
   throw new Error('Capital history canvas element not found');
 }
 
-const display = new Display(contentElement, rateHistoryCanvasElement, capitalHistoryCanvasElement);
+if (!decisionHistoryCanvasElement) {
+  throw new Error('Decision history canvas element not found');
+}
+
+const display = new Display(
+  contentElement,
+  rateHistoryCanvasElement,
+  capitalHistoryCanvasElement,
+  decisionHistoryCanvasElement
+);
 const environment = new Environment();
 const agents: Agent[] = [
   new RandomAgent('Alice'),
@@ -54,5 +64,5 @@ loop((time: number) => {
 
   // feedback can be provided here
 
-  return time < 1000; // Return true to continue the loop, false to stop
+  return time < 100; // Return true to continue the loop, false to stop
 });
