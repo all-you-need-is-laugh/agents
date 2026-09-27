@@ -101,5 +101,7 @@ export class Environment {
     }
     
     this._exchangeRate = Math.abs(Math.cos(time * 0.1));
+
+    this._agentActions.clear();
   }
 }
