@@ -1,4 +1,3 @@
-import * as echarts from "echarts/core";
 import { HeatmapChart, LineChart } from "echarts/charts";
 import {
   AxisPointerComponent,
@@ -8,6 +7,7 @@ import {
   TooltipComponent,
   VisualMapComponent,
 } from "echarts/components";
+import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { EnvironmentDisplayState } from "./Environment";
 
@@ -142,7 +142,7 @@ export class Display {
     const usdAmounts = perAgent(agent => agent.usdAmount, NaN);
     const goldAmounts = perAgent(agent => agent.goldAmount, NaN);
     const capitals = perAgent(agent => agent.capital, NaN);
-    const decisions = perAgent(agent => agent.action?.buy ?? 0, 0);
+    const decisions = perAgent(agent => agent.action?.buyGoldAmount ?? 0, 0);
 
     return {
       times: history.map(({ time }) => time.toString()),

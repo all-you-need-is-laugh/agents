@@ -9,7 +9,7 @@ export class RandomAgent implements Agent {
 
   getAction(time: number, state: EnvironmentAgentState): Action {
     return {
-      buy: (Math.random() * 2 - 1) * this._leverage
+      buyGoldAmount: (Math.random() * 2 - 1) * this._leverage
     };
   }
 }

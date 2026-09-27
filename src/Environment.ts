@@ -19,7 +19,7 @@ export interface EnvironmentAgentState {
 }
 
 export type Action = {
-  buy: number
+  buyGoldAmount: number
 };
 
 export interface EnvironmentDisplayState {
@@ -104,18 +104,18 @@ export class Environment {
     for (const [agent, action] of this._agentActions.entries()) {
       const agentState = this._getAgentState(agent);
 
-      if (action.buy > 0) {
-        const price = Math.min(action.buy, this._transactionAmountLimit) * this._buyRate;
-        const canSpend = Math.min(price, agentState.usdAmount);
+      if (action.buyGoldAmount > 0) {
+        const price = Math.min(action.buyGoldAmount, this._transactionAmountLimit) * this._buyRate;
+        const canSpendUsd = Math.min(price, agentState.usdAmount);
 
-        agentState.usdAmount -= canSpend;
-        agentState.goldAmount += canSpend / this._buyRate;
-      } else if (action.buy < 0) {
-        const price = Math.min(Math.abs(action.buy), this._transactionAmountLimit) * this._sellRate;
-        const canSell = Math.min(price, agentState.goldAmount);
+        agentState.usdAmount -= canSpendUsd;
+        agentState.goldAmount += canSpendUsd / this._buyRate;
+      } else if (action.buyGoldAmount < 0) {
+        const canSellGold = Math.min(Math.abs(action.buyGoldAmount), agentState.goldAmount, this._transactionAmountLimit);
 
-        agentState.usdAmount += canSell;
-        agentState.goldAmount -= canSell / this._sellRate;
+
+        agentState.usdAmount += canSellGold * this._sellRate;
+        agentState.goldAmount -= canSellGold;
       }
     }
     

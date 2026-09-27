@@ -35,12 +35,12 @@ export class NeuralNetworkAgent implements Agent {
     
     if (shouldBuy) {
       return {
-        buy: Math.max(0.01, state.usdAmount * output[2] / state.buyRate)
+        buyGoldAmount: Math.max(0.01, state.usdAmount * output[2] / state.buyRate)
       }
     }
 
     return {
-        buy: - Math.max(0.01, state.goldAmount * output[2])
+        buyGoldAmount: - Math.max(0.01, state.goldAmount * output[2])
       }
   }
 
