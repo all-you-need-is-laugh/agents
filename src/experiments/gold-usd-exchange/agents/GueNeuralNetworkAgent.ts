@@ -1,7 +1,8 @@
-import { Action, Agent, EnvironmentAgentState } from "../Environment";
-import { NeuralNetwork } from "../NeuralNetwork";
+import { NeuralNetwork } from "../../../base/NeuralNetwork";
+import { GueAction, GueEnvironmentAgentState } from "../GueEnvironment";
+import { GueAgent } from "./GueAgent";
 
-export class NeuralNetworkAgent implements Agent {
+export class GueNeuralNetworkAgent implements GueAgent {
   public readonly id: string;
   private _neuralNetwork: NeuralNetwork;
 
@@ -18,17 +19,17 @@ export class NeuralNetworkAgent implements Agent {
     );
   }
 
-  getAction(time: number, state: EnvironmentAgentState): Action {
+  getAction(time: number, state: GueEnvironmentAgentState): GueAction {
     const input = this._encodeInputForNeuralNetwork(time, state);
     const output = this._neuralNetwork.execute(input);
     return this._decodeOutputFromNeuralNetwork(time, state, output);
   }
 
-  private _encodeInputForNeuralNetwork(time: number, state: EnvironmentAgentState): number[] {
+  private _encodeInputForNeuralNetwork(time: number, state: GueEnvironmentAgentState): number[] {
     return [time, state.buyRate, state.sellRate, state.goldAmount, state.usdAmount];
   }
 
-  private _decodeOutputFromNeuralNetwork(time: number, state: EnvironmentAgentState, output: number[]): Action {
+  private _decodeOutputFromNeuralNetwork(time: number, state: GueEnvironmentAgentState, output: number[]): GueAction {
     const normalizedProbabilities = this._normalizeProbabilities([output[0], output[1]]);
     const [buyProbability] = normalizedProbabilities;
     const shouldBuy = Math.random() < buyProbability;

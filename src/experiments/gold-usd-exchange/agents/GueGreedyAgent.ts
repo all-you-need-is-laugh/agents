@@ -1,6 +1,7 @@
-import { Action, Agent, EnvironmentAgentState } from "../Environment";
+import { GueAction, GueEnvironmentAgentState } from "../GueEnvironment";
+import { GueAgent } from "./GueAgent";
 
-export class GreedyAgent implements Agent {
+export class GueGreedyAgent implements GueAgent {
   public readonly id: string;
   constructor(
     name: string,
@@ -10,7 +11,7 @@ export class GreedyAgent implements Agent {
     this.id = `${name} (greedy: ${this._buyThreshold}/${this._sellThreshold})`
   }
 
-  getAction(time: number, state: EnvironmentAgentState): Action {
+  getAction(time: number, state: GueEnvironmentAgentState): GueAction {
     if (state.buyRate <= this._buyThreshold) {
       return { buyGoldAmount: 100 }
     }

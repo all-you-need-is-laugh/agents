@@ -9,7 +9,8 @@ import {
 } from "echarts/components";
 import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
-import { EnvironmentDisplayState } from "./Environment";
+import { Display, DisplayContext } from "../../../base/Display";
+import { GueEnvironmentDisplayState } from "../GueEnvironment";
 
 echarts.use([
   LineChart,
@@ -22,11 +23,6 @@ echarts.use([
   VisualMapComponent,
   CanvasRenderer,
 ]);
-
-export interface DisplayContext {
-  environmentState: EnvironmentDisplayState;
-  time: number;
-};
 
 // per-series values indexed by tick, aligned with times
 interface ChartData {
@@ -100,7 +96,7 @@ const agentColor = (agentIndex: number) => SERIES_COLORS[agentIndex % SERIES_COL
 const colorDot = (color: string) =>
   `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${color}"></span>`;
 
-export class Display {
+export class GueDisplay implements Display<GueEnvironmentDisplayState> {
   // FPS is averaged over each second and refreshed once per second
   private _fps = 0;
   private _fpsWindowStart = 0;
@@ -162,20 +158,24 @@ export class Display {
       else if (event.key === 'ArrowRight') this._moveCapture(1, event);
     });
   }
+  update(simulationHistory: DisplayContext<GueEnvironmentDisplayState>[], forceDrawing?: boolean): void {
+    const last = simulationHistory[simulationHistory.length - 1];
 
-  // number of frames between chart redraws, as set in the control above the charts
-  public get chartUpdateInterval(): number {
-    return this._chartUpdateInterval;
+    this.updateText(simulationHistory);
+    // the last frame is always drawn, so the charts end on the final state
+    if (last.time % this._chartUpdateInterval === 0 || forceDrawing) {
+      this.updateCharts(simulationHistory);
+    }
   }
 
-  public updateText(history: DisplayContext[]) {
+  public updateText(history: DisplayContext<GueEnvironmentDisplayState>[]) {
     const current = history.at(-1);
     if (!current) return;
 
     this._updateText(current);
   }
 
-  public updateCharts(history: DisplayContext[]) {
+  public updateCharts(history: DisplayContext<GueEnvironmentDisplayState>[]) {
     if (history.length === 0) return;
 
     this._drawCharts(this._toChartData(history));
@@ -188,7 +188,7 @@ export class Display {
       sellRate,
       agents
     }
-  }: DisplayContext): void {
+  }: DisplayContext<GueEnvironmentDisplayState>): void {
     const now = Date.now();
     if (!this._fpsWindowStart) this._fpsWindowStart = now;
     this._fpsWindowFrames++;
@@ -219,12 +219,12 @@ export class Display {
     `;
   }
 
-  private _toChartData(history: DisplayContext[]): ChartData {
+  private _toChartData(history: DisplayContext<GueEnvironmentDisplayState>[]): ChartData {
     const agentIds = [...new Set(history.flatMap(({ environmentState }) =>
       environmentState.agents.map(agent => agent.id)
     ))];
 
-    type AgentDisplayState = EnvironmentDisplayState['agents'][number];
+    type AgentDisplayState = GueEnvironmentDisplayState['agents'][number];
 
     // an agent missing at some tick gets `missing` there (no point / no decision)
     const perAgent = (pick: (agent: AgentDisplayState) => number, missing: number) =>
