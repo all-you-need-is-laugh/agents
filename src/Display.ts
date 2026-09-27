@@ -63,6 +63,10 @@ const GRID_BOUNDS = { left: 160, right: 30, outerBoundsMode: 'none' as const };
 
 const LEGEND_HEIGHT = 22;
 
+const ZERO_CAPITAL_COLOR = '#bdbdbd';
+// capital is a sum of floats, so treat dust as zero
+const ZERO_CAPITAL_EPSILON = 1e-9;
+
 const TOOLTIP_ROW_HIGHLIGHT = 'rgba(0, 0, 0, 0.08)';
 
 const agentColor = (agentIndex: number) => SERIES_COLORS[agentIndex % SERIES_COLORS.length];
@@ -207,6 +211,14 @@ export class Display {
     const intendedHeatmap = toHeatmap(data.intendedActions, 2 + agentIds.length);
     const appliedHeatmap = toHeatmap(data.appliedActions, 3 + agentIds.length);
 
+    // ticks where an agent has nothing left to trade with; drawn over its applied row
+    const bankruptCells: [number, number, number][] = [];
+    agentIds.forEach((agentId, agentIndex) => {
+      data.capitals.get(agentId)!.forEach((capital, timeIndex) => {
+        if (capital <= ZERO_CAPITAL_EPSILON) bankruptCells.push([timeIndex, agentIndex, 1]);
+      });
+    });
+
     const rateGridTop = LEGEND_HEIGHT + 30;
     const capitalGridTop = rateGridTop + 220;
     const actionGridHeight = 24 * agentIds.length;
@@ -267,7 +279,18 @@ export class Display {
           name: 'Applied', nameLocation: 'start',
         },
       ],
-      visualMap: [intendedHeatmap.visualMap, appliedHeatmap.visualMap],
+      visualMap: [
+        intendedHeatmap.visualMap,
+        appliedHeatmap.visualMap,
+        // heatmaps require a visualMap; this one maps every zero-capital cell to the same grey
+        {
+          show: false,
+          seriesIndex: 4 + agentIds.length,
+          min: 0,
+          max: 1,
+          inRange: { color: [ZERO_CAPITAL_COLOR, ZERO_CAPITAL_COLOR] },
+        },
+      ],
       series: [
         {
           name: 'Buy rate', type: 'line', showSymbol: false,
@@ -296,6 +319,12 @@ export class Display {
           name: 'Applied actions', type: 'heatmap',
           xAxisIndex: APPLIED_ACTION_GRID, yAxisIndex: APPLIED_ACTION_GRID,
           data: appliedHeatmap.heatmapData,
+        },
+        {
+          // separate series with its own single-color visualMap, so the action colors never apply
+          name: 'Zero capital', type: 'heatmap',
+          xAxisIndex: APPLIED_ACTION_GRID, yAxisIndex: APPLIED_ACTION_GRID,
+          data: bankruptCells,
         },
       ],
     });
