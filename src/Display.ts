@@ -111,11 +111,16 @@ export class Display {
     });
   }
 
-  public update(history: DisplayContext[]) {
+  public updateText(history: DisplayContext[]) {
     const current = history.at(-1);
     if (!current) return;
 
     this._updateText(current);
+  }
+
+  public updateCharts(history: DisplayContext[]) {
+    if (history.length === 0) return;
+
     this._drawCharts(this._toChartData(history));
   }
 

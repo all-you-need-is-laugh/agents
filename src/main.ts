@@ -7,6 +7,7 @@ import { loop } from "./utils/loop";
 
 const contentElement = document.querySelector<HTMLDivElement>('#app');
 const chartElement = document.querySelector<HTMLDivElement>('#charts');
+const chartUpdateIntervalInput = document.querySelector<HTMLInputElement>('#chart-update-interval');
 
 if (!contentElement) {
   throw new Error('Content element not found');
@@ -15,6 +16,13 @@ if (!contentElement) {
 if (!chartElement) {
   throw new Error('Chart element not found');
 }
+
+if (!chartUpdateIntervalInput) {
+  throw new Error('Chart update interval input not found');
+}
+
+// read on every frame, so a change in the input applies immediately; invalid input falls back to 1
+const getChartUpdateInterval = () => Math.max(1, Math.floor(chartUpdateIntervalInput.valueAsNumber) || 1);
 
 const display = new Display(contentElement, chartElement);
 const environment = new Environment();
@@ -47,9 +55,16 @@ loop((time: number) => {
   const environmentState = environment.getDisplayState();
 
   simulationHistory.push({ time, environmentState });
-  display.update(simulationHistory);
+
+  const shouldContinue = time < 1000; // true to continue the loop, false to stop
+
+  display.updateText(simulationHistory);
+  // the last frame is always drawn, so the charts end on the final state
+  if (time % getChartUpdateInterval() === 0 || !shouldContinue) {
+    display.updateCharts(simulationHistory);
+  }
 
   // feedback can be provided here
 
-  return time < 1000; // Return true to continue the loop, false to stop
+  return shouldContinue;
 });
