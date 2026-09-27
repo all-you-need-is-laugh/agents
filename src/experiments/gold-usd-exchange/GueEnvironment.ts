@@ -91,7 +91,9 @@ export class GueEnvironment extends Environment<
     }
   }
 
-  protected _convertAgentIntentToAllowedAction(agentId: GueAgentId, action: GueAction, agentState: GueAgentState): GueAction {
+  protected _convertAgentIntentToAllowedAction(agentId: GueAgentId, action: GueAction): GueAction {
+    const agentState = this._getAgentState(agentId);
+
     if (action.buyGoldAmount > 0) {
       const price = Math.min(action.buyGoldAmount, this._transactionAmountLimit) * this._buyRate;
       const canSpendUsd = Math.min(price, agentState.usdAmount);

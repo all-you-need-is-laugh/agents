@@ -32,7 +32,7 @@ export abstract class Environment<
   abstract getStateFor(agentId: TAgentId): TEnvironmentAgentState;
   abstract getDisplayState(): TEnvironmentDisplayState;
   protected abstract _generateStartingAgentState (agent: TAgent): TAgentState;
-  protected abstract _convertAgentIntentToAllowedAction(agentId: TAgentId, action: TAction, agentState: TAgentState): TAction;
+  protected abstract _convertAgentIntentToAllowedAction(agentId: TAgentId, action: TAction): TAction;
 
   addAgent(agent: TAgent) {
     this._agentStates.push(
@@ -57,9 +57,7 @@ export abstract class Environment<
     this._lastAgentAppliedActions = new Map();
 
     for (const [agentId, action] of this._agentActionIntents.entries()) {
-      const agentState = this._getAgentState(agentId);
-
-      const allowedAction = this._convertAgentIntentToAllowedAction(agentId, action, agentState);
+      const allowedAction = this._convertAgentIntentToAllowedAction(agentId, action);
 
       this._lastAgentAppliedActions.set(agentId, allowedAction);
     }
