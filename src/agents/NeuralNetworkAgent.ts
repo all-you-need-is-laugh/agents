@@ -1,5 +1,5 @@
-import { Action, Agent, EnvironmentAgentState } from "./Environment";
-import { NeuralNetwork } from "./NeuralNetwork";
+import { Action, Agent, EnvironmentAgentState } from "../Environment";
+import { NeuralNetwork } from "../NeuralNetwork";
 
 export class NeuralNetworkAgent implements Agent {
   public readonly id: string;

@@ -1,8 +1,8 @@
 import { GreedyAgent } from "./agents/GreedyAgent";
+import { NeuralNetworkAgent } from "./agents/NeuralNetworkAgent";
 import { RandomAgent } from "./agents/RandomAgent";
 import { Display, DisplayContext } from "./Display";
 import { Agent, Environment } from "./Environment";
-import { NeuralNetworkAgent } from "./NeuralNetworkAgent";
 import { loop } from "./utils/loop";
 
 const contentElement = document.querySelector<HTMLDivElement>('#app');
