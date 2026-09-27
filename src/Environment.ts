@@ -40,6 +40,7 @@ export class Environment {
   private _lastAgentActionIntents = new Map<AgentId, Action>();
   private _lastAgentAppliedActions = new Map<AgentId, Action>();
   private _agentStates: AgentState[] = [];
+  private _exchangeRateRandomOffset = Date.now();
 
   private _exchangeRate = 1;
   private _buyDeviation = 0.1;
@@ -142,8 +143,9 @@ export class Environment {
       });
     }
     
-    // this._exchangeRate = Math.cos(time * Math.abs(Math.sin(time * 0.01)) * 0.025) / 2 + 0.5 + (Math.random() * 2 - 1) * 0.1;
-    this._exchangeRate = Math.cos(time * 0.5) / 2 + 0.5 + (Math.random() * 2 - 1) * 0.1;
+    const rateSeed = time + this._exchangeRateRandomOffset;
+    this._exchangeRate = Math.cos(rateSeed * 0.05) / 2 + 0.5 + (Math.random() * 2 - 1) * 0.1;
+    // this._exchangeRate = Math.cos(time * 0.5) / 2 + 0.5 + (Math.random() * 2 - 1) * 0.1;
     this._buyDeviation = 0.01 + Math.random() * 0.5;
     this._sellDeviation = 0.01 + Math.random() * 0.5;
 

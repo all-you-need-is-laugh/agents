@@ -51,5 +51,5 @@ loop((time: number) => {
 
   // feedback can be provided here
 
-  return time < 100; // Return true to continue the loop, false to stop
+  return time < 1000; // Return true to continue the loop, false to stop
 });
