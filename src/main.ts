@@ -5,26 +5,13 @@ import { Display, DisplayContext } from "./Display";
 import { Agent, Environment } from "./Environment";
 import { loop } from "./utils/loop";
 
-const contentElement = document.querySelector<HTMLDivElement>('#app');
-const chartElement = document.querySelector<HTMLDivElement>('#charts');
-const chartUpdateIntervalInput = document.querySelector<HTMLInputElement>('#chart-update-interval');
+const rootElement = document.querySelector<HTMLDivElement>('#app');
 
-if (!contentElement) {
-  throw new Error('Content element not found');
+if (!rootElement) {
+  throw new Error('Root element not found');
 }
 
-if (!chartElement) {
-  throw new Error('Chart element not found');
-}
-
-if (!chartUpdateIntervalInput) {
-  throw new Error('Chart update interval input not found');
-}
-
-// read on every frame, so a change in the input applies immediately; invalid input falls back to 1
-const getChartUpdateInterval = () => Math.max(1, Math.floor(chartUpdateIntervalInput.valueAsNumber) || 1);
-
-const display = new Display(contentElement, chartElement);
+const display = new Display(rootElement);
 const environment = new Environment();
 const agents: Agent[] = [
   new RandomAgent('Alice'),
@@ -60,7 +47,7 @@ loop((time: number) => {
 
   display.updateText(simulationHistory);
   // the last frame is always drawn, so the charts end on the final state
-  if (time % getChartUpdateInterval() === 0 || !shouldContinue) {
+  if (time % display.chartUpdateInterval === 0 || !shouldContinue) {
     display.updateCharts(simulationHistory);
   }
 

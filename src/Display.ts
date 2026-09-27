@@ -69,6 +69,32 @@ const ZERO_CAPITAL_EPSILON = 1e-9;
 
 const TOOLTIP_ROW_HIGHLIGHT = 'rgba(0, 0, 0, 0.08)';
 
+const CHART_UPDATE_INTERVAL_STORAGE_KEY = 'chartUpdateInterval';
+const DEFAULT_CHART_UPDATE_INTERVAL = 10;
+
+// invalid or missing values fall back to the default; anything below 1 frame is clamped to 1
+const parseChartUpdateInterval = (value: string | null) => {
+  const interval = Math.floor(Number(value));
+  return value && Number.isFinite(interval) ? Math.max(1, interval) : DEFAULT_CHART_UPDATE_INTERVAL;
+};
+
+// storage can be unavailable (private mode, blocked site data), so both accessors never throw
+const readStoredChartUpdateInterval = () => {
+  try {
+    return parseChartUpdateInterval(localStorage.getItem(CHART_UPDATE_INTERVAL_STORAGE_KEY));
+  } catch {
+    return DEFAULT_CHART_UPDATE_INTERVAL;
+  }
+};
+
+const storeChartUpdateInterval = (interval: number) => {
+  try {
+    localStorage.setItem(CHART_UPDATE_INTERVAL_STORAGE_KEY, String(interval));
+  } catch {
+    // not persisted; the value still applies for this session
+  }
+};
+
 const agentColor = (agentIndex: number) => SERIES_COLORS[agentIndex % SERIES_COLORS.length];
 
 const colorDot = (color: string) =>
@@ -94,10 +120,23 @@ export class Display {
   // agents whose capital line is switched off from the tooltip checkboxes
   private _hiddenAgentIds = new Set<string>();
 
-  constructor(
-    private textContentElement: HTMLElement,
-    private chartElement: HTMLElement
-  ) {
+  private _chartUpdateInterval = readStoredChartUpdateInterval();
+
+  private textContentElement: HTMLElement;
+  private chartElement: HTMLElement;
+
+  // builds the whole UI inside rootElement: stats text, chart update control, then the charts
+  constructor(rootElement: HTMLElement) {
+    this.textContentElement = document.createElement('div');
+
+    const chartElement = document.createElement('div');
+    // starting size; the height is refitted to the content on every chart redraw
+    chartElement.style.width = '900px';
+    chartElement.style.height = '780px';
+    this.chartElement = chartElement;
+
+    rootElement.replaceChildren(this.textContentElement, this._createChartUpdateIntervalControl(), chartElement);
+
     this._chart = echarts.init(chartElement);
 
     this._chart.getZr().on('click', ({ offsetX, offsetY }) => this._capture(offsetX, offsetY));
@@ -119,6 +158,11 @@ export class Display {
       else if (event.key === 'ArrowLeft') this._moveCapture(-1, event);
       else if (event.key === 'ArrowRight') this._moveCapture(1, event);
     });
+  }
+
+  // number of frames between chart redraws, as set in the control above the charts
+  public get chartUpdateInterval(): number {
+    return this._chartUpdateInterval;
   }
 
   public updateText(history: DisplayContext[]) {
@@ -425,6 +469,27 @@ export class Display {
     }
 
     this._isHoveringActions = gridIndex !== undefined;
+  }
+
+  private _createChartUpdateIntervalControl(): HTMLLabelElement {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.step = '1';
+    input.value = String(this._chartUpdateInterval);
+    input.style.width = '60px';
+
+    input.addEventListener('input', () => {
+      // an empty or half-typed value keeps the last valid interval until it is completed
+      if (!Number.isFinite(input.valueAsNumber)) return;
+
+      this._chartUpdateInterval = parseChartUpdateInterval(input.value);
+      storeChartUpdateInterval(this._chartUpdateInterval);
+    });
+
+    const label = document.createElement('label');
+    label.append('Update charts every ', input, ' frames');
+    return label;
   }
 
   private _toggleAgent(agentId: string, isVisible: boolean): void {
