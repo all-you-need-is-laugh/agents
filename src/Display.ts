@@ -59,6 +59,8 @@ const GRID_BOUNDS = { left: 160, right: 30, outerBoundsMode: 'none' as const };
 
 const LEGEND_HEIGHT = 22;
 
+const TOOLTIP_ROW_HIGHLIGHT = 'rgba(0, 0, 0, 0.08)';
+
 const agentColor = (agentIndex: number) => SERIES_COLORS[agentIndex % SERIES_COLORS.length];
 
 const colorDot = (color: string) =>
@@ -76,6 +78,11 @@ export class Display {
   // time the tooltip is pinned to by a click; null while it follows the mouse
   private _capturedTime: string | null = null;
 
+  // series (rate or agent) whose line is under the mouse; its tooltip row gets highlighted
+  private _hoveredSeries: string | null = null;
+  // whether _hoveredSeries was set from the decision chart, so leaving it clears only its own highlight
+  private _isHoveringDecisions = false;
+
   constructor(
     private textContentElement: HTMLElement,
     private chartElement: HTMLElement
@@ -83,6 +90,12 @@ export class Display {
     this._chart = echarts.init(chartElement);
 
     this._chart.getZr().on('click', ({ offsetX, offsetY }) => this._capture(offsetX, offsetY));
+
+    this._chart.on('mouseover', { seriesType: 'line' }, ({ seriesName }) => {
+      if (seriesName) this._setHoveredSeries(seriesName);
+    });
+    this._chart.on('mouseout', { seriesType: 'line' }, () => this._setHoveredSeries(null));
+    this._chart.getZr().on('mousemove', ({ offsetX, offsetY }) => this._hoverDecisionRow(offsetX, offsetY));
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') this._release();
       else if (event.key === 'ArrowLeft') this._moveCapture(-1, event);
@@ -234,17 +247,19 @@ export class Display {
         {
           name: 'Buy rate', type: 'line', showSymbol: false,
           xAxisIndex: RATE_GRID, yAxisIndex: RATE_GRID,
-          data: data.buyRates, itemStyle: { color: BUY_COLOR },
+          data: data.buyRates, itemStyle: { color: BUY_COLOR }, triggerLineEvent: true,
         },
         {
           name: 'Sell rate', type: 'line', showSymbol: false,
           xAxisIndex: RATE_GRID, yAxisIndex: RATE_GRID,
-          data: data.sellRates, itemStyle: { color: SELL_COLOR },
+          data: data.sellRates, itemStyle: { color: SELL_COLOR }, triggerLineEvent: true,
         },
         ...agentIds.map((agentId, index) => ({
           name: agentId, type: 'line' as const, showSymbol: false,
           xAxisIndex: CAPITAL_GRID, yAxisIndex: CAPITAL_GRID,
           data: data.capitals.get(agentId),
+          // fire mouseover for the line itself, not only its (hidden) symbols
+          triggerLineEvent: true,
           itemStyle: { color: agentColor(index) },
         })),
         {
@@ -322,6 +337,31 @@ export class Display {
       : { type: 'hideTip' });
   }
 
+  // decision rows are resolved from the pointer's y, since empty heatmap cells emit no mouse events
+  private _hoverDecisionRow(x: number, y: number): void {
+    const agentIds = this._data?.agentIds ?? [];
+    const isOverDecisions = this._chart.containPixel({ gridIndex: DECISION_GRID }, [x, y]);
+
+    if (isOverDecisions) {
+      const value = this._chart.convertFromPixel({ yAxisIndex: DECISION_GRID }, y) as number;
+      this._setHoveredSeries(agentIds[Math.round(value)] ?? null);
+    } else if (this._isHoveringDecisions) {
+      this._setHoveredSeries(null);
+    }
+
+    this._isHoveringDecisions = isOverDecisions;
+  }
+
+  private _setHoveredSeries(series: string | null): void {
+    if (this._hoveredSeries === series) return;
+    this._hoveredSeries = series;
+
+    // the tooltip only re-renders when the hovered tick changes, so restyle the rows already shown
+    this.chartElement.querySelectorAll<HTMLElement>('[data-series]').forEach(row => {
+      row.style.background = row.dataset.series === series ? TOOLTIP_ROW_HIGHLIGHT : '';
+    });
+  }
+
   private _fitChartHeight(height: number): void {
     if (this.chartElement.clientHeight === height) return;
     this.chartElement.style.height = `${height}px`;
@@ -337,6 +377,10 @@ export class Display {
     const index = data.times.indexOf(time);
     if (index < 0) return '';
 
+    // tags a row with its series so hovering that series line can highlight it
+    const rowAttributes = (series: string) =>
+      `data-series="${series}" style="background:${series === this._hoveredSeries ? TOOLTIP_ROW_HIGHLIGHT : ''}"`;
+
     const decision = (value: number) => {
       if (!value) return '—';
       const color = value > 0 ? BUY_COLOR : SELL_COLOR;
@@ -345,8 +389,8 @@ export class Display {
 
     return `
       <b>Time ${time}</b>${this._capturedTime === null ? '' : ' <span style="color:#e63946">(captured: ←/→ to move, Esc to release)</span>'}<br/>
-      Buy rate: ${data.buyRates[index].toFixed(4)}<br/>
-      Sell rate: ${data.sellRates[index].toFixed(4)}
+      <div ${rowAttributes('Buy rate')}>${colorDot(BUY_COLOR)}Buy rate: ${data.buyRates[index].toFixed(4)}</div>
+      <div ${rowAttributes('Sell rate')}>${colorDot(SELL_COLOR)}Sell rate: ${data.sellRates[index].toFixed(4)}</div>
       <table style="margin-top:4px">
         <tr>
           <td><b>Agent</b></td>
@@ -356,7 +400,7 @@ export class Display {
           <td style="padding-left:12px"><b>Decision</b></td>
         </tr>
         ${data.agentIds.map((agentId, agentIndex) => `
-          <tr>
+          <tr ${rowAttributes(agentId)}>
             <td>${colorDot(agentColor(agentIndex))}${agentId}</td>
             <td style="padding-left:12px">${data.usdAmounts.get(agentId)![index].toFixed(2)}</td>
             <td style="padding-left:12px">${data.goldAmounts.get(agentId)![index].toFixed(2)}</td>
