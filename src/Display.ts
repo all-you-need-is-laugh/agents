@@ -185,6 +185,10 @@ export class Display {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'line' },
+        // pinned just past the chart's right edge so it never covers the plots
+        position: (_point: number[], _params: unknown, _dom: unknown, _rect: unknown, size: { viewSize: number[] }) =>
+          [size.viewSize[0] + 10, 0],
+        transitionDuration: 0,
         formatter: (params: unknown) => this._formatTooltip(params, data),
       },
       axisPointer: { link: [{ xAxisIndex: 'all' }] },
