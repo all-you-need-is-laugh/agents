@@ -44,7 +44,7 @@ export class Environment {
   private _transactionAmountLimit = 100;
 
   private get _buyRate(): number {
-    return this._exchangeRate + this._buyDeviation;
+    return Math.max(0.0001, this._exchangeRate + this._buyDeviation);
   }
 
   private get _sellRate(): number {
@@ -116,7 +116,7 @@ export class Environment {
       }
     }
     
-    this._exchangeRate = Math.cos(time * 0.1) / 2 + 0.5 + (Math.random() * 2 - 1) * 0.1;
+    this._exchangeRate = Math.cos(time * Math.abs(Math.sin(time * 0.01)) * 0.025) / 2 + 0.5 + (Math.random() * 2 - 1) * 0.1;
     this._buyDeviation = 0.01 + Math.random() * 0.5;
     this._sellDeviation = 0.01 + Math.random() * 0.5;
 

@@ -7,11 +7,17 @@ import { loop } from "./utils/loop";
 
 const contentElement = document.querySelector<HTMLDivElement>('#app');
 
+const rateHistoryCanvasElement = document.querySelector<HTMLCanvasElement>('#rate-history');
+
 if (!contentElement) {
   throw new Error('Content element not found');
 }
 
-const display = new Display(contentElement);
+if (!rateHistoryCanvasElement) {
+  throw new Error('Rate history canvas element not found');
+}
+
+const display = new Display(contentElement, rateHistoryCanvasElement);
 const environment = new Environment();
 const agents: Agent[] = [
   new RandomAgent('Alice'),
