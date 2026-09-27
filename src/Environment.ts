@@ -104,6 +104,10 @@ export class Environment {
     this._agentActionIntents.set(agentId, action);
   }
 
+  private _toMoney(input: number): number {
+    return Number(input.toFixed(2));
+  }
+
   update (time: number) {
     this._lastAgentAppliedActions = new Map();
 
@@ -115,7 +119,7 @@ export class Environment {
         const canSpendUsd = Math.min(price, agentState.usdAmount);
         const canBuyGoldAmoount = canSpendUsd / this._buyRate;
 
-        agentState.usdAmount -= canSpendUsd;
+        agentState.usdAmount = this._toMoney(agentState.usdAmount - canSpendUsd);
         agentState.goldAmount += canBuyGoldAmoount;
 
         this._lastAgentAppliedActions.set(agentId, {
@@ -128,7 +132,7 @@ export class Environment {
       if (action.buyGoldAmount < 0) {
         const canSellGold = Math.min(Math.abs(action.buyGoldAmount), agentState.goldAmount, this._transactionAmountLimit);
         
-        agentState.usdAmount += canSellGold * this._sellRate;
+        agentState.usdAmount = this._toMoney(agentState.usdAmount + canSellGold * this._sellRate);
         agentState.goldAmount -= canSellGold;
 
         this._lastAgentAppliedActions.set(agentId, {
