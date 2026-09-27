@@ -1,46 +1,67 @@
+import * as echarts from "echarts/core";
+import { HeatmapChart, LineChart } from "echarts/charts";
+import {
+  AxisPointerComponent,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  VisualMapComponent,
+} from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
 import { EnvironmentDisplayState } from "./Environment";
+
+echarts.use([
+  LineChart,
+  HeatmapChart,
+  GridComponent,
+  AxisPointerComponent,
+  LegendComponent,
+  TooltipComponent,
+  VisualMapComponent,
+  CanvasRenderer,
+]);
 
 interface DisplayContext {
   environmentState: EnvironmentDisplayState;
   time: number;
 };
 
-interface HistoryPoint {
-  time: number;
-  value: number;
-}
-
-interface ChartSeries {
-  name: string;
-  color: string;
-  history: HistoryPoint[];
-}
-
 const SERIES_COLORS = [
   '#2a9d8f', '#e76f51', '#264653', '#e9c46a', '#8338ec',
   '#ff006e', '#3a86ff', '#fb5607', '#6a994e', '#bc6c25',
 ];
 
+const BUY_COLOR = '#2a9d8f';
+const SELL_COLOR = '#e76f51';
+
+// the three charts are grids of a single chart instance, so one tooltip covers all of them
+const RATE_GRID = 0;
+const CAPITAL_GRID = 1;
+const DECISION_GRID = 2;
+
 export class Display {
   private _lastUpdateTime = 0;
 
-  private _buyRateHistory: HistoryPoint[] = [];
-  private _sellRateHistory: HistoryPoint[] = [];
-  private _capitalHistory = new Map<string, HistoryPoint[]>();
-  private _decisionHistory = new Map<string, HistoryPoint[]>();
+  private _chart: echarts.ECharts;
+
+  // all histories are indexed by tick, aligned with _times
+  private _times: string[] = [];
+  private _buyRateHistory: number[] = [];
+  private _sellRateHistory: number[] = [];
+  private _capitalHistory = new Map<string, number[]>();
+  private _decisionHistory = new Map<string, number[]>();
 
   constructor(
     private textContentElement: HTMLElement,
-    private rateHistoryCanvasElement: HTMLCanvasElement,
-    private capitalHistoryCanvasElement: HTMLCanvasElement,
-    private decisionHistoryCanvasElement: HTMLCanvasElement
-  ) { }
+    chartElement: HTMLElement
+  ) {
+    this._chart = echarts.init(chartElement);
+  }
 
   public update(displayContext: DisplayContext) {
     this._updateText(displayContext);
-    this._updateRateHistory(displayContext);
-    this._updateCapitalHistory(displayContext);
-    this._updateDecisionHistory(displayContext);
+    this._updateHistory(displayContext);
+    this._drawCharts();
   }
 
   private _updateText({
@@ -74,204 +95,140 @@ export class Display {
     `;
   }
 
-  private _updateRateHistory({
+  private _updateHistory({
     time,
     environmentState: {
       buyRate,
       sellRate,
-    }
-  }: DisplayContext): void {
-    this._buyRateHistory.push({ time, value: buyRate });
-    this._sellRateHistory.push({ time, value: sellRate });
-
-    this._drawChart(this.rateHistoryCanvasElement, [
-      { name: 'Sell rate', color: SERIES_COLORS[1], history: this._sellRateHistory },
-      { name: 'Buy rate', color: SERIES_COLORS[0], history: this._buyRateHistory },
-    ]);
-  }
-
-  private _updateCapitalHistory({
-    time,
-    environmentState: {
       agents,
     }
   }: DisplayContext): void {
-    for (const agent of agents) {
-      let history = this._capitalHistory.get(agent.id);
-      if (!history) {
-        history = [];
-        this._capitalHistory.set(agent.id, history);
-      }
-      history.push({ time, value: agent.capital });
-    }
+    this._times.push(time.toString());
+    this._buyRateHistory.push(buyRate);
+    this._sellRateHistory.push(sellRate);
 
-    this._drawChart(
-      this.capitalHistoryCanvasElement,
-      [...this._capitalHistory].map(([name, history], index) => ({
-        name,
-        color: SERIES_COLORS[index % SERIES_COLORS.length],
-        history,
-      }))
-    );
+    for (const agent of agents) {
+      this._getHistory(this._capitalHistory, agent.id).push(agent.capital);
+      this._getHistory(this._decisionHistory, agent.id).push(agent.action?.buy ?? 0);
+    }
   }
 
-  private _updateDecisionHistory({
-    time,
-    environmentState: {
-      agents,
+  // an agent added mid-run gets its history padded so indices stay aligned with _times
+  private _getHistory(histories: Map<string, number[]>, agentId: string): number[] {
+    let history = histories.get(agentId);
+    if (!history) {
+      history = new Array(this._times.length - 1).fill(NaN);
+      histories.set(agentId, history);
     }
-  }: DisplayContext): void {
-    for (const agent of agents) {
-      let history = this._decisionHistory.get(agent.id);
-      if (!history) {
-        history = [];
-        this._decisionHistory.set(agent.id, history);
-      }
-      history.push({ time, value: agent.action?.buy ?? 0 });
-    }
-
-    this._drawDecisionChart(this.decisionHistoryCanvasElement);
+    return history;
   }
 
-  // one row per agent, one cell per tick: green = buy, red = sell, opacity = amount
-  private _drawDecisionChart(canvas: HTMLCanvasElement): void {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  private _drawCharts(): void {
+    const agentIds = [...this._capitalHistory.keys()];
 
-    const { width, height } = canvas;
-    const padding = { top: 10, right: 10, bottom: 20, left: 60 };
-    const plotWidth = width - padding.left - padding.right;
-    const plotHeight = height - padding.top - padding.bottom;
-
-    ctx.clearRect(0, 0, width, height);
-
-    let minTime = Infinity;
-    let maxTime = -Infinity;
+    const heatmapData: [number, number, number][] = [];
     let maxAmount = 0;
-    for (const history of this._decisionHistory.values()) {
-      for (const { time, value } of history) {
-        if (time < minTime) minTime = time;
-        if (time > maxTime) maxTime = time;
-        if (Math.abs(value) > maxAmount) maxAmount = Math.abs(value);
-      }
-    }
-    if (minTime === Infinity) return;
-
-    const rows = [...this._decisionHistory];
-    const rowHeight = plotHeight / rows.length;
-    const cellWidth = plotWidth / (maxTime - minTime + 1);
-
-    // agent names
-    ctx.fillStyle = '#888';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    rows.forEach(([name], index) => {
-      ctx.fillText(name, padding.left - 4, padding.top + (index + 0.5) * rowHeight);
+    agentIds.forEach((agentId, agentIndex) => {
+      this._decisionHistory.get(agentId)!.forEach((value, timeIndex) => {
+        if (!value) return;
+        heatmapData.push([timeIndex, agentIndex, value]);
+        maxAmount = Math.max(maxAmount, Math.abs(value));
+      });
     });
 
-    // time labels
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(minTime.toString(), padding.left, padding.top + plotHeight + 4);
-    ctx.textAlign = 'right';
-    ctx.fillText(maxTime.toString(), padding.left + plotWidth, padding.top + plotHeight + 4);
-
-    // cells
-    rows.forEach(([, history], index) => {
-      const y = padding.top + index * rowHeight;
-      for (const { time, value } of history) {
-        if (value === 0 || maxAmount === 0) continue;
-        ctx.globalAlpha = 0.15 + 0.85 * Math.abs(value) / maxAmount;
-        ctx.fillStyle = value > 0 ? '#2a9d8f' : '#e76f51';
-        ctx.fillRect(padding.left + (time - minTime) * cellWidth, y + 1, Math.max(cellWidth, 1), rowHeight - 2);
-      }
+    const xAxis = (gridIndex: number) => ({
+      type: 'category' as const,
+      gridIndex,
+      data: this._times,
+      boundaryGap: gridIndex === DECISION_GRID,
+      axisLabel: { show: gridIndex === DECISION_GRID },
     });
-    ctx.globalAlpha = 1;
+
+    this._chart.setOption({
+      animation: false,
+      color: SERIES_COLORS,
+      legend: {
+        top: 0,
+        data: ['Buy rate', 'Sell rate', ...agentIds],
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'line' },
+        formatter: (params: unknown) => this._formatTooltip(params, agentIds),
+      },
+      axisPointer: { link: [{ xAxisIndex: 'all' }] },
+      grid: [
+        { top: 50, height: 180, left: 70, right: 30 },
+        { top: 270, height: 220, left: 70, right: 30 },
+        { top: 530, height: 24 * agentIds.length, left: 70, right: 30 },
+      ],
+      xAxis: [xAxis(RATE_GRID), xAxis(CAPITAL_GRID), xAxis(DECISION_GRID)],
+      yAxis: [
+        { type: 'value', gridIndex: RATE_GRID, name: 'Rate', scale: true },
+        { type: 'value', gridIndex: CAPITAL_GRID, name: 'Capital', scale: true },
+        { type: 'category', gridIndex: DECISION_GRID, data: agentIds, inverse: true },
+      ],
+      visualMap: {
+        show: false,
+        seriesIndex: 2 + agentIds.length,
+        min: -maxAmount || -1,
+        max: maxAmount || 1,
+        inRange: { color: [SELL_COLOR, '#ffffff', BUY_COLOR] },
+      },
+      series: [
+        {
+          name: 'Buy rate', type: 'line', showSymbol: false,
+          xAxisIndex: RATE_GRID, yAxisIndex: RATE_GRID,
+          data: this._buyRateHistory, itemStyle: { color: BUY_COLOR },
+        },
+        {
+          name: 'Sell rate', type: 'line', showSymbol: false,
+          xAxisIndex: RATE_GRID, yAxisIndex: RATE_GRID,
+          data: this._sellRateHistory, itemStyle: { color: SELL_COLOR },
+        },
+        ...agentIds.map((agentId, index) => ({
+          name: agentId, type: 'line' as const, showSymbol: false,
+          xAxisIndex: CAPITAL_GRID, yAxisIndex: CAPITAL_GRID,
+          data: this._capitalHistory.get(agentId),
+          itemStyle: { color: SERIES_COLORS[index % SERIES_COLORS.length] },
+        })),
+        {
+          name: 'Decisions', type: 'heatmap',
+          xAxisIndex: DECISION_GRID, yAxisIndex: DECISION_GRID,
+          data: heatmapData,
+        },
+      ],
+    });
   }
 
-  private _drawChart(canvas: HTMLCanvasElement, series: ChartSeries[]): void {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  // built from the stored histories rather than params, so it looks the same whichever grid is hovered
+  private _formatTooltip(params: unknown, agentIds: string[]): string {
+    const [first] = params as { axisValue: string }[];
+    if (!first) return '';
 
-    const { width, height } = canvas;
-    const legendWidth = 100;
-    const padding = { top: 10, right: 10 + legendWidth, bottom: 20, left: 60 };
-    const plotWidth = width - padding.left - padding.right;
-    const plotHeight = height - padding.top - padding.bottom;
+    const index = this._times.indexOf(first.axisValue);
+    if (index < 0) return '';
 
-    ctx.clearRect(0, 0, width, height);
+    const decision = (value: number) => {
+      if (!value) return '—';
+      const color = value > 0 ? BUY_COLOR : SELL_COLOR;
+      return `<span style="color:${color}">${value > 0 ? 'buy' : 'sell'} ${Math.abs(value).toFixed(2)}</span>`;
+    };
 
-    // loop instead of Math.min(...values): spread overflows the stack on long histories
-    let minTime = Infinity;
-    let maxTime = -Infinity;
-    let min = Infinity;
-    let max = -Infinity;
-    for (const { history } of series) {
-      for (const { time, value } of history) {
-        if (time < minTime) minTime = time;
-        if (time > maxTime) maxTime = time;
-        if (value < min) min = value;
-        if (value > max) max = value;
-      }
-    }
-    if (minTime === Infinity) return;
-    if (min === max) {
-      min -= 1;
-      max += 1;
-    }
-
-    const toX = (time: number) =>
-      padding.left + (minTime === maxTime ? 0 : ((time - minTime) / (maxTime - minTime)) * plotWidth);
-    const toY = (value: number) =>
-      padding.top + (1 - (value - min) / (max - min)) * plotHeight;
-
-    // axes
-    ctx.strokeStyle = '#888';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, padding.top);
-    ctx.lineTo(padding.left, padding.top + plotHeight);
-    ctx.lineTo(padding.left + plotWidth, padding.top + plotHeight);
-    ctx.stroke();
-
-    // labels
-    ctx.fillStyle = '#888';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(max.toFixed(2), padding.left - 4, padding.top);
-    ctx.fillText(min.toFixed(2), padding.left - 4, padding.top + plotHeight);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(minTime.toString(), padding.left, padding.top + plotHeight + 4);
-    ctx.textAlign = 'right';
-    ctx.fillText(maxTime.toString(), padding.left + plotWidth, padding.top + plotHeight + 4);
-
-    // lines
-    ctx.lineWidth = 1.5;
-    for (const { color, history } of series) {
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      history.forEach(({ time, value }, index) => {
-        const x = toX(time);
-        const y = toY(value);
-        if (index === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-    }
-
-    // legend
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    series.forEach(({ name, color }, index) => {
-      const x = width - legendWidth;
-      const y = padding.top + 6 + index * 16;
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y - 4, 10, 8);
-      ctx.fillStyle = '#888';
-      ctx.fillText(name, x + 16, y);
-    });
+    return `
+      <b>Time ${first.axisValue}</b><br/>
+      Buy rate: ${this._buyRateHistory[index].toFixed(4)}<br/>
+      Sell rate: ${this._sellRateHistory[index].toFixed(4)}
+      <table style="margin-top:4px">
+        <tr><td><b>Agent</b></td><td style="padding-left:12px"><b>Capital</b></td><td style="padding-left:12px"><b>Decision</b></td></tr>
+        ${agentIds.map(agentId => `
+          <tr>
+            <td>${agentId}</td>
+            <td style="padding-left:12px">${this._capitalHistory.get(agentId)![index].toFixed(2)}</td>
+            <td style="padding-left:12px">${decision(this._decisionHistory.get(agentId)![index])}</td>
+          </tr>
+        `).join('')}
+      </table>
+    `;
   }
 }

@@ -6,40 +6,24 @@ import { NeuralNetworkAgent } from "./NeuralNetworkAgent";
 import { loop } from "./utils/loop";
 
 const contentElement = document.querySelector<HTMLDivElement>('#app');
-
-const rateHistoryCanvasElement = document.querySelector<HTMLCanvasElement>('#rate-history');
-const capitalHistoryCanvasElement = document.querySelector<HTMLCanvasElement>('#capital-history');
-const decisionHistoryCanvasElement = document.querySelector<HTMLCanvasElement>('#decision-history');
+const chartElement = document.querySelector<HTMLDivElement>('#charts');
 
 if (!contentElement) {
   throw new Error('Content element not found');
 }
 
-if (!rateHistoryCanvasElement) {
-  throw new Error('Rate history canvas element not found');
+if (!chartElement) {
+  throw new Error('Chart element not found');
 }
 
-if (!capitalHistoryCanvasElement) {
-  throw new Error('Capital history canvas element not found');
-}
-
-if (!decisionHistoryCanvasElement) {
-  throw new Error('Decision history canvas element not found');
-}
-
-const display = new Display(
-  contentElement,
-  rateHistoryCanvasElement,
-  capitalHistoryCanvasElement,
-  decisionHistoryCanvasElement
-);
+const display = new Display(contentElement, chartElement);
 const environment = new Environment();
 const agents: Agent[] = [
   new RandomAgent('Alice'),
   new RandomAgent('Bob'),
   new RandomAgent('Carl'),
-  new GreedyAgent('Dave'),
-  new GreedyAgent('Erl', 0.49, 0.51),
+  new GreedyAgent('Dave', 0.5, 1.5),
+  new GreedyAgent('Erl', 0.99, 1),
   new NeuralNetworkAgent('Freddy', [3]),
   new NeuralNetworkAgent('Geena', [4]),
   new NeuralNetworkAgent('Henry', [5]),
