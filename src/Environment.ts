@@ -2,7 +2,7 @@ export type AgentId = string;
 
 export interface Agent {
   id: AgentId;
-  getAction(state: EnvironmentAgentState): Action;
+  getAction(time: number, state: EnvironmentAgentState): Action;
 }
 
 interface AgentState {

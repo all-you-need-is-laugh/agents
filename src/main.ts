@@ -1,7 +1,7 @@
+import { GreedyAgent } from "./agents/GreedyAgent";
+import { RandomAgent } from "./agents/RandomAgent";
 import { Display } from "./Display";
 import { Agent, Environment } from "./Environment";
-import { GreedyAgent } from "./GreedyAgent";
-import { RandomAgent } from "./RandomAgent";
 import { loop } from "./utils/loop";
 
 const contentElement = document.querySelector<HTMLDivElement>('#app');
@@ -27,7 +27,7 @@ for (const agent of agents) {
 loop((time: number) => {
   for (const agent of agents) {
     const state = environment.getStateFor(agent.id);
-    const action = agent.getAction(state);
+    const action = agent.getAction(time, state);
     environment.addActionIntent(agent.id, action);
   }
 

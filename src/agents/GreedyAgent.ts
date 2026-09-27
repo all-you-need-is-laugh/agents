@@ -1,4 +1,4 @@
-import { Action, Agent, EnvironmentAgentState } from "./Environment";
+import { Action, Agent, EnvironmentAgentState } from "../Environment";
 
 export class GreedyAgent implements Agent {
   public readonly id: string;
@@ -10,7 +10,7 @@ export class GreedyAgent implements Agent {
     this.id = `${name} (greedy: ${this._buyThreshold}/${this._sellThreshold})`
   }
 
-  getAction(state: EnvironmentAgentState): Action {
+  getAction(time: number, state: EnvironmentAgentState): Action {
     if (state.exchangeRate <= this._buyThreshold) {
       return { buy: 1 }
     }
