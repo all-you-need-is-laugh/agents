@@ -159,27 +159,15 @@ export class GueDisplay implements Display<GueEnvironmentDisplayState> {
       else if (event.key === 'ArrowRight') this._moveCapture(1, event);
     });
   }
-  update(simulationHistory: DisplayContext<GueEnvironmentDisplayState>[], forceDrawing?: boolean): void {
-    const last = simulationHistory[simulationHistory.length - 1];
-
-    this.updateText(simulationHistory);
-    // the last frame is always drawn, so the charts end on the final state
-    if (last.time % this._chartUpdateInterval === 0 || forceDrawing) {
-      this.updateCharts(simulationHistory);
-    }
-  }
-
-  public updateText(history: DisplayContext<GueEnvironmentDisplayState>[]) {
+  update(history: DisplayContext<GueEnvironmentDisplayState>[], forceDrawing?: boolean): void {
     const current = history.at(-1);
     if (!current) return;
 
     this._updateText(current);
-  }
-
-  public updateCharts(history: DisplayContext<GueEnvironmentDisplayState>[]) {
-    if (history.length === 0) return;
-
-    this._drawCharts(this._toChartData(history));
+    // the last frame is always drawn, so the charts end on the final state
+    if (current.time % this._chartUpdateInterval === 0 || forceDrawing) {
+      this._updateCharts(history);
+    }
   }
 
   private _updateText({
@@ -218,6 +206,12 @@ export class GueDisplay implements Display<GueEnvironmentDisplayState> {
       }
       </table>
     `;
+  }
+
+  private _updateCharts(history: DisplayContext<GueEnvironmentDisplayState>[]) {
+    if (history.length === 0) return;
+
+    this._drawCharts(this._toChartData(history));
   }
 
   private _toChartData(history: DisplayContext<GueEnvironmentDisplayState>[]): ChartData {
