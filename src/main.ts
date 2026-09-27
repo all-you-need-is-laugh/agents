@@ -8,6 +8,7 @@ import { loop } from "./utils/loop";
 const contentElement = document.querySelector<HTMLDivElement>('#app');
 
 const rateHistoryCanvasElement = document.querySelector<HTMLCanvasElement>('#rate-history');
+const capitalHistoryCanvasElement = document.querySelector<HTMLCanvasElement>('#capital-history');
 
 if (!contentElement) {
   throw new Error('Content element not found');
@@ -17,7 +18,11 @@ if (!rateHistoryCanvasElement) {
   throw new Error('Rate history canvas element not found');
 }
 
-const display = new Display(contentElement, rateHistoryCanvasElement);
+if (!capitalHistoryCanvasElement) {
+  throw new Error('Capital history canvas element not found');
+}
+
+const display = new Display(contentElement, rateHistoryCanvasElement, capitalHistoryCanvasElement);
 const environment = new Environment();
 const agents: Agent[] = [
   new RandomAgent('Alice'),
