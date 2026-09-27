@@ -37,7 +37,8 @@ interface ChartData {
   usdAmounts: Map<string, number[]>;
   goldAmounts: Map<string, number[]>;
   capitals: Map<string, number[]>;
-  decisions: Map<string, number[]>;
+  intendedActions: Map<string, number[]>;
+  appliedActions: Map<string, number[]>;
 }
 
 const SERIES_COLORS = [
@@ -48,10 +49,13 @@ const SERIES_COLORS = [
 const BUY_COLOR = '#2a9d8f';
 const SELL_COLOR = '#e76f51';
 
-// the three charts are grids of a single chart instance, so one tooltip covers all of them
+// all charts are grids of a single chart instance, so one tooltip covers all of them
 const RATE_GRID = 0;
 const CAPITAL_GRID = 1;
-const DECISION_GRID = 2;
+const INTENDED_ACTION_GRID = 2;
+const APPLIED_ACTION_GRID = 3;
+const ALL_GRIDS = [RATE_GRID, CAPITAL_GRID, INTENDED_ACTION_GRID, APPLIED_ACTION_GRID];
+const ACTION_GRIDS = [INTENDED_ACTION_GRID, APPLIED_ACTION_GRID];
 
 // fixed plot bounds for every grid; 'none' stops ECharts from shrinking each grid to fit
 // its own axis labels, which would misalign them. left must fit the longest agent name
@@ -80,8 +84,8 @@ export class Display {
 
   // series (rate or agent) whose line is under the mouse; its tooltip row gets highlighted
   private _hoveredSeries: string | null = null;
-  // whether _hoveredSeries was set from the decision chart, so leaving it clears only its own highlight
-  private _isHoveringDecisions = false;
+  // whether _hoveredSeries was set from an action chart, so leaving it clears only its own highlight
+  private _isHoveringActions = false;
 
   constructor(
     private textContentElement: HTMLElement,
@@ -95,7 +99,7 @@ export class Display {
       if (seriesName) this._setHoveredSeries(seriesName);
     });
     this._chart.on('mouseout', { seriesType: 'line' }, () => this._setHoveredSeries(null));
-    this._chart.getZr().on('mousemove', ({ offsetX, offsetY }) => this._hoverDecisionRow(offsetX, offsetY));
+    this._chart.getZr().on('mousemove', ({ offsetX, offsetY }) => this._hoverActionRow(offsetX, offsetY));
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') this._release();
       else if (event.key === 'ArrowLeft') this._moveCapture(-1, event);
@@ -159,7 +163,8 @@ export class Display {
     const usdAmounts = perAgent(agent => agent.usdAmount, NaN);
     const goldAmounts = perAgent(agent => agent.goldAmount, NaN);
     const capitals = perAgent(agent => agent.capital, NaN);
-    const decisions = perAgent(agent => agent.intentAction?.buyGoldAmount ?? 0, 0);
+    const intendedActions = perAgent(agent => agent.intentAction?.buyGoldAmount ?? 0, 0);
+    const appliedActions = perAgent(agent => agent.appliedAction?.buyGoldAmount ?? 0, 0);
 
     return {
       times: history.map(({ time }) => time.toString()),
@@ -169,32 +174,40 @@ export class Display {
       usdAmounts,
       goldAmounts,
       capitals,
-      decisions,
+      intendedActions,
+      appliedActions,
     };
   }
 
   private _drawCharts(data: ChartData): void {
     const { agentIds } = data;
 
-    const heatmapData: [number, number, number][] = [];
+    // both action charts share one color scale, so the same amount has the same shade in each
     let maxAmount = 0;
-    agentIds.forEach((agentId, agentIndex) => {
-      data.decisions.get(agentId)!.forEach((value, timeIndex) => {
-        if (!value) return;
-        heatmapData.push([timeIndex, agentIndex, value]);
-        maxAmount = Math.max(maxAmount, Math.abs(value));
+    const toHeatmapData = (actions: Map<string, number[]>) => {
+      const heatmapData: [number, number, number][] = [];
+      agentIds.forEach((agentId, agentIndex) => {
+        actions.get(agentId)!.forEach((value, timeIndex) => {
+          if (!value) return;
+          heatmapData.push([timeIndex, agentIndex, value]);
+          maxAmount = Math.max(maxAmount, Math.abs(value));
+        });
       });
-    });
+      return heatmapData;
+    };
+    const intendedHeatmapData = toHeatmapData(data.intendedActions);
+    const appliedHeatmapData = toHeatmapData(data.appliedActions);
 
     const rateGridTop = LEGEND_HEIGHT + 30;
     const capitalGridTop = rateGridTop + 220;
-    const decisionGridTop = capitalGridTop + 260;
-    const decisionGridHeight = 24 * agentIds.length;
-    this._fitChartHeight(decisionGridTop + decisionGridHeight + 30);
+    const actionGridHeight = 24 * agentIds.length;
+    const intendedActionGridTop = capitalGridTop + 260;
+    const appliedActionGridTop = intendedActionGridTop + actionGridHeight + 30;
+    this._fitChartHeight(appliedActionGridTop + actionGridHeight + 30);
 
     this._data = data;
     this._plotTop = rateGridTop;
-    this._plotBottom = decisionGridTop + decisionGridHeight;
+    this._plotBottom = appliedActionGridTop + actionGridHeight;
 
     const xAxis = (gridIndex: number) => ({
       type: 'category' as const,
@@ -202,7 +215,7 @@ export class Display {
       data: data.times,
       // same on every grid, so a tick has the same x across all charts
       boundaryGap: true,
-      axisLabel: { show: gridIndex === DECISION_GRID },
+      axisLabel: { show: gridIndex === APPLIED_ACTION_GRID },
     });
 
     this._chart.setOption({
@@ -228,17 +241,26 @@ export class Display {
       grid: [
         { ...GRID_BOUNDS, top: rateGridTop, height: 180 },
         { ...GRID_BOUNDS, top: capitalGridTop, height: 220 },
-        { ...GRID_BOUNDS, top: decisionGridTop, height: decisionGridHeight },
+        { ...GRID_BOUNDS, top: intendedActionGridTop, height: actionGridHeight },
+        { ...GRID_BOUNDS, top: appliedActionGridTop, height: actionGridHeight },
       ],
-      xAxis: [xAxis(RATE_GRID), xAxis(CAPITAL_GRID), xAxis(DECISION_GRID)],
+      xAxis: ALL_GRIDS.map(xAxis),
       yAxis: [
         { type: 'value', gridIndex: RATE_GRID, name: 'Rate', scale: true },
         { type: 'value', gridIndex: CAPITAL_GRID, name: 'Capital', scale: true },
-        { type: 'category', gridIndex: DECISION_GRID, data: agentIds, inverse: true },
+        // inverse puts the first agent on top; nameLocation 'start' is then the top as well
+        {
+          type: 'category', gridIndex: INTENDED_ACTION_GRID, data: agentIds, inverse: true,
+          name: 'Intended', nameLocation: 'start',
+        },
+        {
+          type: 'category', gridIndex: APPLIED_ACTION_GRID, data: agentIds, inverse: true,
+          name: 'Applied', nameLocation: 'start',
+        },
       ],
       visualMap: {
         show: false,
-        seriesIndex: 2 + agentIds.length,
+        seriesIndex: [2 + agentIds.length, 3 + agentIds.length],
         min: -maxAmount || -1,
         max: maxAmount || 1,
         inRange: { color: [SELL_COLOR, '#ffffff', BUY_COLOR] },
@@ -263,9 +285,14 @@ export class Display {
           itemStyle: { color: agentColor(index) },
         })),
         {
-          name: 'Decisions', type: 'heatmap',
-          xAxisIndex: DECISION_GRID, yAxisIndex: DECISION_GRID,
-          data: heatmapData,
+          name: 'Intended actions', type: 'heatmap',
+          xAxisIndex: INTENDED_ACTION_GRID, yAxisIndex: INTENDED_ACTION_GRID,
+          data: intendedHeatmapData,
+        },
+        {
+          name: 'Applied actions', type: 'heatmap',
+          xAxisIndex: APPLIED_ACTION_GRID, yAxisIndex: APPLIED_ACTION_GRID,
+          data: appliedHeatmapData,
         },
       ],
     });
@@ -276,8 +303,7 @@ export class Display {
   private _capture(x: number, y: number): void {
     if (!this._data) return;
 
-    const gridIndex = [RATE_GRID, CAPITAL_GRID, DECISION_GRID]
-      .find(gridIndex => this._chart.containPixel({ gridIndex }, [x, y]));
+    const gridIndex = ALL_GRIDS.find(gridIndex => this._chart.containPixel({ gridIndex }, [x, y]));
     if (gridIndex === undefined) return;
 
     const value = this._chart.convertFromPixel({ xAxisIndex: gridIndex }, x) as number;
@@ -337,19 +363,19 @@ export class Display {
       : { type: 'hideTip' });
   }
 
-  // decision rows are resolved from the pointer's y, since empty heatmap cells emit no mouse events
-  private _hoverDecisionRow(x: number, y: number): void {
+  // action rows are resolved from the pointer's y, since empty heatmap cells emit no mouse events
+  private _hoverActionRow(x: number, y: number): void {
     const agentIds = this._data?.agentIds ?? [];
-    const isOverDecisions = this._chart.containPixel({ gridIndex: DECISION_GRID }, [x, y]);
+    const gridIndex = ACTION_GRIDS.find(gridIndex => this._chart.containPixel({ gridIndex }, [x, y]));
 
-    if (isOverDecisions) {
-      const value = this._chart.convertFromPixel({ yAxisIndex: DECISION_GRID }, y) as number;
+    if (gridIndex !== undefined) {
+      const value = this._chart.convertFromPixel({ yAxisIndex: gridIndex }, y) as number;
       this._setHoveredSeries(agentIds[Math.round(value)] ?? null);
-    } else if (this._isHoveringDecisions) {
+    } else if (this._isHoveringActions) {
       this._setHoveredSeries(null);
     }
 
-    this._isHoveringDecisions = isOverDecisions;
+    this._isHoveringActions = gridIndex !== undefined;
   }
 
   private _setHoveredSeries(series: string | null): void {
@@ -381,7 +407,7 @@ export class Display {
     const rowAttributes = (series: string) =>
       `data-series="${series}" style="background:${series === this._hoveredSeries ? TOOLTIP_ROW_HIGHLIGHT : ''}"`;
 
-    const decision = (value: number) => {
+    const action = (value: number) => {
       if (!value) return '—';
       const color = value > 0 ? BUY_COLOR : SELL_COLOR;
       return `<span style="color:${color}">${value > 0 ? 'buy' : 'sell'} ${Math.abs(value).toFixed(2)}</span>`;
@@ -397,7 +423,8 @@ export class Display {
           <td style="padding-left:12px"><b>USD</b></td>
           <td style="padding-left:12px"><b>Gold</b></td>
           <td style="padding-left:12px"><b>Capital</b></td>
-          <td style="padding-left:12px"><b>Decision</b></td>
+          <td style="padding-left:12px"><b>Intended</b></td>
+          <td style="padding-left:12px"><b>Applied</b></td>
         </tr>
         ${data.agentIds.map((agentId, agentIndex) => `
           <tr ${rowAttributes(agentId)}>
@@ -405,7 +432,8 @@ export class Display {
             <td style="padding-left:12px">${data.usdAmounts.get(agentId)![index].toFixed(2)}</td>
             <td style="padding-left:12px">${data.goldAmounts.get(agentId)![index].toFixed(2)}</td>
             <td style="padding-left:12px">${data.capitals.get(agentId)![index].toFixed(2)}</td>
-            <td style="padding-left:12px">${decision(data.decisions.get(agentId)![index])}</td>
+            <td style="padding-left:12px">${action(data.intendedActions.get(agentId)![index])}</td>
+            <td style="padding-left:12px">${action(data.appliedActions.get(agentId)![index])}</td>
           </tr>
         `).join('')}
       </table>
