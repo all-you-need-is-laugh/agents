@@ -12,18 +12,6 @@ import { CanvasRenderer } from "echarts/renderers";
 import { Display, DisplayContext } from "../../../base/Display";
 import { GueEnvironmentDisplayState } from "../GueEnvironment";
 
-echarts.use([
-  LineChart,
-  HeatmapChart,
-  GridComponent,
-  AxisPointerComponent,
-  GraphicComponent,
-  LegendComponent,
-  TooltipComponent,
-  VisualMapComponent,
-  CanvasRenderer,
-]);
-
 // per-series values indexed by tick, aligned with times
 interface ChartData {
   times: string[];
@@ -135,6 +123,19 @@ export class GueDisplay implements Display<GueEnvironmentDisplayState> {
     this.chartElement = chartElement;
 
     rootElement.replaceChildren(this.textContentElement, this._createChartUpdateIntervalControl(), chartElement);
+
+    // must run before init; echarts.use skips already registered parts, so repeated calls are no-ops
+    echarts.use([
+      LineChart,
+      HeatmapChart,
+      GridComponent,
+      AxisPointerComponent,
+      GraphicComponent,
+      LegendComponent,
+      TooltipComponent,
+      VisualMapComponent,
+      CanvasRenderer,
+    ]);
 
     this._chart = echarts.init(chartElement);
 
