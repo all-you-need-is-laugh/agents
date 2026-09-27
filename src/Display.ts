@@ -130,11 +130,11 @@ export class Display {
       <br/>
       <table>
         <tr>
-          <td width=200><b>Name</b></td><td width=100><b>USD</b></td><td width=100><b>Gold</b></td><td width=100><b>Capital</b></td>
+          <td width=200><b>Name</b></td><td width=100><b>USD</b></td><td width=100><b>Gold</b></td><td width=100><b>Capital</b></td><td width=200><b>Decided</b></td>
         </tr>
         ${agents.map(agent => `
             <tr>
-              <td>${agent.id}</td><td>${agent.usdAmount.toFixed(2)}</td><td>${agent.goldAmount.toFixed(2)}</td><td>${agent.capital.toFixed(2)}</td>
+              <td>${agent.id}</td><td>${agent.usdAmount.toFixed(2)}</td><td>${agent.goldAmount.toFixed(2)}</td><td>${agent.capital.toFixed(2)}</td><td>${agent.appliedAction?.buyGoldAmount.toFixed(2)} (${agent.intentAction?.buyGoldAmount.toFixed(2)})</td>
             </tr>
           `).join('\n')
       }
@@ -159,7 +159,7 @@ export class Display {
     const usdAmounts = perAgent(agent => agent.usdAmount, NaN);
     const goldAmounts = perAgent(agent => agent.goldAmount, NaN);
     const capitals = perAgent(agent => agent.capital, NaN);
-    const decisions = perAgent(agent => agent.action?.buyGoldAmount ?? 0, 0);
+    const decisions = perAgent(agent => agent.intentAction?.buyGoldAmount ?? 0, 0);
 
     return {
       times: history.map(({ time }) => time.toString()),

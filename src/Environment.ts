@@ -30,13 +30,15 @@ export interface EnvironmentDisplayState {
     goldAmount: number;
     usdAmount: number;
     capital: number;
-    action: Action | null;
+    intentAction: Action | null;
+    appliedAction: Action | null;
   }[];
 }
 
 export class Environment {
-  private _agentActions = new Map<AgentId, Action>();
-  private _lastAgentActions = new Map<AgentId, Action>();
+  private _agentActionIntents = new Map<AgentId, Action>();
+  private _lastAgentActionIntents = new Map<AgentId, Action>();
+  private _lastAgentAppliedActions = new Map<AgentId, Action>();
   private _agentStates: AgentState[] = [];
 
   private _exchangeRate = 1;
@@ -91,32 +93,53 @@ export class Environment {
         goldAmount: s.goldAmount,
         usdAmount: s.usdAmount,
         capital: s.usdAmount + s.goldAmount * this._sellRate,
-        action: this._lastAgentActions.get(s.id) ?? null,
+        intentAction: this._lastAgentActionIntents.get(s.id) ?? null,
+        appliedAction: this._lastAgentAppliedActions.get(s.id) ?? null,
       }))
     };
   }
 
   addActionIntent(agentId: AgentId, action: Action) {
-    this._agentActions.set(agentId, action);
+    this._agentActionIntents.set(agentId, action);
   }
 
   update (time: number) {
-    for (const [agent, action] of this._agentActions.entries()) {
-      const agentState = this._getAgentState(agent);
+    this._lastAgentAppliedActions = new Map();
+
+    for (const [agentId, action] of this._agentActionIntents.entries()) {
+      const agentState = this._getAgentState(agentId);
 
       if (action.buyGoldAmount > 0) {
         const price = Math.min(action.buyGoldAmount, this._transactionAmountLimit) * this._buyRate;
         const canSpendUsd = Math.min(price, agentState.usdAmount);
+        const canBuyGoldAmoount = canSpendUsd / this._buyRate;
 
         agentState.usdAmount -= canSpendUsd;
-        agentState.goldAmount += canSpendUsd / this._buyRate;
-      } else if (action.buyGoldAmount < 0) {
+        agentState.goldAmount += canBuyGoldAmoount;
+
+        this._lastAgentAppliedActions.set(agentId, {
+          buyGoldAmount: canBuyGoldAmoount
+        });
+
+        continue;
+      }
+      
+      if (action.buyGoldAmount < 0) {
         const canSellGold = Math.min(Math.abs(action.buyGoldAmount), agentState.goldAmount, this._transactionAmountLimit);
-
-
+        
         agentState.usdAmount += canSellGold * this._sellRate;
         agentState.goldAmount -= canSellGold;
+
+        this._lastAgentAppliedActions.set(agentId, {
+          buyGoldAmount: -canSellGold
+        });
+
+        continue;
       }
+
+      this._lastAgentAppliedActions.set(agentId, {
+        buyGoldAmount: 0
+      });
     }
     
     // this._exchangeRate = Math.cos(time * Math.abs(Math.sin(time * 0.01)) * 0.025) / 2 + 0.5 + (Math.random() * 2 - 1) * 0.1;
@@ -124,7 +147,7 @@ export class Environment {
     this._buyDeviation = 0.01 + Math.random() * 0.5;
     this._sellDeviation = 0.01 + Math.random() * 0.5;
 
-    this._lastAgentActions = new Map(this._agentActions);
-    this._agentActions.clear();
+    this._lastAgentActionIntents = new Map(this._agentActionIntents);
+    this._agentActionIntents.clear();
   }
 }
