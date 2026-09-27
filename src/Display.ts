@@ -12,7 +12,8 @@ export class Display {
   public update({
   time,
   environmentState: {
-    exchangeRate,
+    buyRate,
+    sellRate,
     agents
   }
 }: DisplayContext) {
@@ -22,7 +23,8 @@ export class Display {
 
     this.contentElement.innerHTML = `
       <div>Time lapsed: ${time} [FPS: ${fps.toFixed(0)}]</div>
-      <div>Exchange rate: ${exchangeRate}</div>
+      <div>Buy rate: ${buyRate}</div>
+      <div>Sell rate: ${sellRate}</div>
       <br/>
       <table>
         <tr>

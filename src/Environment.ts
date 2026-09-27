@@ -12,7 +12,8 @@ interface AgentState {
 }
 
 export interface EnvironmentAgentState {
-  exchangeRate: number;
+  buyRate: number;
+  sellRate: number;
   goldAmount: number;
   usdAmount: number;
 }
@@ -22,7 +23,8 @@ export type Action = {
 };
 
 export interface EnvironmentDisplayState {
-  exchangeRate: number;
+  buyRate: number;
+  sellRate: number;
   agents: {
     id: AgentId;
     goldAmount: number;
@@ -36,7 +38,18 @@ export class Environment {
   private _agentStates: AgentState[] = [];
 
   private _exchangeRate = 1;
+  private _buyDeviation = 0.1;
+  private _sellDeviation = 0.1;
+
   private _transactionAmountLimit = 100;
+
+  private get _buyRate(): number {
+    return this._exchangeRate + this._buyDeviation;
+  }
+
+  private get _sellRate(): number {
+    return Math.max(0.0001, this._exchangeRate - this._sellDeviation);
+  }
 
   addAgent(agentId: AgentId) {
     this._agentStates.push({
@@ -59,7 +72,8 @@ export class Environment {
     const agentState = this._getAgentState(agentId);
 
     return {
-      exchangeRate: this._exchangeRate,
+      buyRate: this._buyRate,
+      sellRate: this._sellRate,
       goldAmount: agentState.goldAmount,
       usdAmount: agentState.usdAmount,
     };
@@ -68,12 +82,13 @@ export class Environment {
   getDisplayState(): EnvironmentDisplayState {
     // Return the current state of the environment for display purposes
     return {
-      exchangeRate: this._exchangeRate,
+      buyRate: this._buyRate,
+      sellRate: this._sellRate,
       agents: this._agentStates.map((s) => ({
         id: s.id,
         goldAmount: s.goldAmount,
         usdAmount: s.usdAmount,
-        capital: s.usdAmount + s.goldAmount * this._exchangeRate
+        capital: s.usdAmount + s.goldAmount * this._sellRate
       }))
     };
   }
@@ -87,21 +102,23 @@ export class Environment {
       const agentState = this._getAgentState(agent);
 
       if (action.buy > 0) {
-        const price = Math.min(action.buy, this._transactionAmountLimit) * this._exchangeRate;
+        const price = Math.min(action.buy, this._transactionAmountLimit) * this._buyRate;
         const canSpend = Math.min(price, agentState.usdAmount);
 
         agentState.usdAmount -= canSpend;
-        agentState.goldAmount += canSpend / this._exchangeRate;
+        agentState.goldAmount += canSpend / this._buyRate;
       } else if (action.buy < 0) {
-        const price = Math.min(Math.abs(action.buy), this._transactionAmountLimit) * this._exchangeRate;
+        const price = Math.min(Math.abs(action.buy), this._transactionAmountLimit) * this._sellRate;
         const canSell = Math.min(price, agentState.goldAmount);
 
         agentState.usdAmount += canSell;
-        agentState.goldAmount -= canSell / this._exchangeRate;
+        agentState.goldAmount -= canSell / this._sellRate;
       }
     }
     
-    this._exchangeRate = Math.abs(Math.cos(time * 0.1));
+    this._exchangeRate = Math.cos(time * 0.1) / 2 + 0.5 + (Math.random() * 2 - 1) * 0.1;
+    this._buyDeviation = 0.01 + Math.random() * 0.5;
+    this._sellDeviation = 0.01 + Math.random() * 0.5;
 
     this._agentActions.clear();
   }

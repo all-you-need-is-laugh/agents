@@ -11,11 +11,11 @@ export class GreedyAgent implements Agent {
   }
 
   getAction(time: number, state: EnvironmentAgentState): Action {
-    if (state.exchangeRate <= this._buyThreshold) {
+    if (state.buyRate <= this._buyThreshold) {
       return { buy: 1 }
     }
 
-    if (state.exchangeRate >= this._sellThreshold) {
+    if (state.sellRate >= this._sellThreshold) {
       return { buy: -1 }
     }
 

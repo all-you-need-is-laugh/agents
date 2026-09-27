@@ -5,7 +5,7 @@ export class NeuralNetworkAgent implements Agent {
   public readonly id: string;
   private _neuralNetwork: NeuralNetwork;
 
-  private _neuralNetworkInputSize = 4;
+  private _neuralNetworkInputSize = 5;
   private _neuralNetworkOutputSize = 3;
 
   constructor(name: string, neuralNetworkInternalLayerSizes: number[]) {
@@ -25,7 +25,7 @@ export class NeuralNetworkAgent implements Agent {
   }
 
   private _encodeInputForNeuralNetwork(time: number, state: EnvironmentAgentState): number[] {
-    return [time, state.exchangeRate, state.goldAmount, state.usdAmount];
+    return [time, state.buyRate, state.sellRate, state.goldAmount, state.usdAmount];
   }
 
   private _decodeOutputFromNeuralNetwork(time: number, state: EnvironmentAgentState, output: number[]): Action {
@@ -35,7 +35,7 @@ export class NeuralNetworkAgent implements Agent {
     
     if (shouldBuy) {
       return {
-        buy: Math.max(0.01, state.usdAmount * output[2] / state.exchangeRate)
+        buy: Math.max(0.01, state.usdAmount * output[2] / state.buyRate)
       }
     }
 
