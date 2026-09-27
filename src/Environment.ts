@@ -36,6 +36,7 @@ export class Environment {
   private _agentStates: AgentState[] = [];
 
   private _exchangeRate = 1;
+  private _transactionAmountLimit = 100;
 
   addAgent(agentId: AgentId) {
     this._agentStates.push({
@@ -86,13 +87,13 @@ export class Environment {
       const agentState = this._getAgentState(agent);
 
       if (action.buy > 0) {
-        const price = action.buy * this._exchangeRate;
+        const price = Math.min(action.buy, this._transactionAmountLimit) * this._exchangeRate;
         const canSpend = Math.min(price, agentState.usdAmount);
 
         agentState.usdAmount -= canSpend;
         agentState.goldAmount += canSpend / this._exchangeRate;
       } else if (action.buy < 0) {
-        const price = Math.abs(action.buy) * this._exchangeRate;
+        const price = Math.min(Math.abs(action.buy), this._transactionAmountLimit) * this._exchangeRate;
         const canSell = Math.min(price, agentState.goldAmount);
 
         agentState.usdAmount += canSell;
