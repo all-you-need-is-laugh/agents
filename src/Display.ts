@@ -182,10 +182,10 @@ export class Display {
   private _drawCharts(data: ChartData): void {
     const { agentIds } = data;
 
-    // both action charts share one color scale, so the same amount has the same shade in each
-    let maxAmount = 0;
-    const toHeatmapData = (actions: Map<string, number[]>) => {
+    // each action chart gets its own color scale, scaled to its own largest amount
+    const toHeatmap = (actions: Map<string, number[]>, seriesIndex: number) => {
       const heatmapData: [number, number, number][] = [];
+      let maxAmount = 0;
       agentIds.forEach((agentId, agentIndex) => {
         actions.get(agentId)!.forEach((value, timeIndex) => {
           if (!value) return;
@@ -193,10 +193,19 @@ export class Display {
           maxAmount = Math.max(maxAmount, Math.abs(value));
         });
       });
-      return heatmapData;
+
+      const visualMap = {
+        show: false,
+        seriesIndex,
+        min: -maxAmount || -1,
+        max: maxAmount || 1,
+        inRange: { color: [SELL_COLOR, '#ffffff', BUY_COLOR] },
+      };
+
+      return { heatmapData, visualMap };
     };
-    const intendedHeatmapData = toHeatmapData(data.intendedActions);
-    const appliedHeatmapData = toHeatmapData(data.appliedActions);
+    const intendedHeatmap = toHeatmap(data.intendedActions, 2 + agentIds.length);
+    const appliedHeatmap = toHeatmap(data.appliedActions, 3 + agentIds.length);
 
     const rateGridTop = LEGEND_HEIGHT + 30;
     const capitalGridTop = rateGridTop + 220;
@@ -258,13 +267,7 @@ export class Display {
           name: 'Applied', nameLocation: 'start',
         },
       ],
-      visualMap: {
-        show: false,
-        seriesIndex: [2 + agentIds.length, 3 + agentIds.length],
-        min: -maxAmount || -1,
-        max: maxAmount || 1,
-        inRange: { color: [SELL_COLOR, '#ffffff', BUY_COLOR] },
-      },
+      visualMap: [intendedHeatmap.visualMap, appliedHeatmap.visualMap],
       series: [
         {
           name: 'Buy rate', type: 'line', showSymbol: false,
@@ -287,12 +290,12 @@ export class Display {
         {
           name: 'Intended actions', type: 'heatmap',
           xAxisIndex: INTENDED_ACTION_GRID, yAxisIndex: INTENDED_ACTION_GRID,
-          data: intendedHeatmapData,
+          data: intendedHeatmap.heatmapData,
         },
         {
           name: 'Applied actions', type: 'heatmap',
           xAxisIndex: APPLIED_ACTION_GRID, yAxisIndex: APPLIED_ACTION_GRID,
-          data: appliedHeatmapData,
+          data: appliedHeatmap.heatmapData,
         },
       ],
     });
