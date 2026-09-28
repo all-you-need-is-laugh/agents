@@ -1,5 +1,5 @@
-import { Agent } from "../../base/Environment";
 import { Experiment } from "../../base/Experiment";
+import { GueAgent } from "./agents/GueAgent";
 import { GueGreedyAgent } from "./agents/GueGreedyAgent";
 import { GueNeuralNetworkAgent } from "./agents/GueNeuralNetworkAgent";
 import { GueRandomAgent } from "./agents/GueRandomAgent";
@@ -19,7 +19,7 @@ export class GueExperiment extends Experiment<
     return 1_000;
   }
 
-  protected _constructAgents(): Agent<GueAgentId, GueAction, GueEnvironmentAgentState>[] {
+  protected _constructAgents(): GueAgent[] {
     return [
       new GueRandomAgent('Alice'),
       new GueRandomAgent('Bob'),
