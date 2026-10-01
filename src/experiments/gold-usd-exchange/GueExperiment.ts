@@ -4,12 +4,13 @@ import { GueGreedyAgent } from "./agents/GueGreedyAgent";
 import { GueNeuralNetworkAgent } from "./agents/GueNeuralNetworkAgent";
 import { GueRandomAgent } from "./agents/GueRandomAgent";
 import { GueDisplay } from "./display/GueDisplay";
-import { GueAction, GueAgentId, GueEnvironment, GueEnvironmentAgentState } from "./GueEnvironment";
+import { GueAction, GueAgentId, GueEnvironment, GueEnvironmentAgentState, GueEnvironmentDisplayState } from "./GueEnvironment";
 
 export class GueExperiment extends Experiment<
   GueAgentId,
   GueAction,
-  GueEnvironmentAgentState
+  GueEnvironmentAgentState,
+  GueEnvironmentDisplayState
 > {
   constructor(htmlContainerElement: HTMLElement) {
     super(htmlContainerElement);

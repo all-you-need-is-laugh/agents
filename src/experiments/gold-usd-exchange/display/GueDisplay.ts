@@ -159,6 +159,7 @@ export class GueDisplay implements Display<GueEnvironmentDisplayState> {
       else if (event.key === 'ArrowRight') this._moveCapture(1, event);
     });
   }
+  
   update(history: DisplayContext<GueEnvironmentDisplayState>[], forceDrawing?: boolean): void {
     const current = history.at(-1);
     if (!current) return;

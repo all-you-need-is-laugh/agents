@@ -4,5 +4,6 @@ export interface DisplayContext<TEnvironmentDisplayState> {
 };
 
 export interface Display<TEnvironmentDisplayState> {
-  update(simulationHistory: DisplayContext<TEnvironmentDisplayState>[], forceDrawing?: boolean): void;
+  // property syntax (not method) so implementations cannot narrow the parameter type
+  update: (simulationHistory: DisplayContext<TEnvironmentDisplayState>[], forceDrawing?: boolean) => void;
 }

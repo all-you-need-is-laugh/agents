@@ -12,7 +12,7 @@ export abstract class Experiment<
     extends Environment<TAgentId, TAction, TEnvironmentAgentState, TEnvironmentDisplayState>
     = Environment<TAgentId, TAction, TEnvironmentAgentState, TEnvironmentDisplayState>,
   TAgent extends Agent<TAgentId, TAction, TEnvironmentAgentState> = Agent<TAgentId, TAction, TEnvironmentAgentState>,
-  TDisplay extends Display<TEnvironmentDisplayState>  = Display<TEnvironmentDisplayState> 
+  TDisplay extends Display<TEnvironmentDisplayState> = Display<TEnvironmentDisplayState> 
 > {
   protected _agents: TAgent[];
   protected _display: TDisplay;
